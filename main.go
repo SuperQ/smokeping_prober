@@ -9,6 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/log"
+	"github.com/prometheus/common/version"
 	"github.com/superq/go-ping"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
@@ -16,29 +17,33 @@ import (
 type hostList []string
 
 func (h *hostList) Set(value string) error {
-  if value == "" {
-    return fmt.Errorf("'%s' is not valid hostname", value)
-  } else {
-    *h = append(*h, value)
-    return nil
-  }
+	if value == "" {
+		return fmt.Errorf("'%s' is not valid hostname", value)
+	} else {
+		*h = append(*h, value)
+		return nil
+	}
 }
 
 func (h *hostList) String() string {
-  return ""
+	return ""
 }
 
 func (h *hostList) IsCumulative() bool {
-  return true
+	return true
 }
 
 func HostList(s kingpin.Settings) (target *[]string) {
-  target = new([]string)
-  s.SetValue((*hostList)(target))
-  return
+	target = new([]string)
+	s.SetValue((*hostList)(target))
+	return
 }
 
 type pingerList []ping.Pinger
+
+func init() {
+	prometheus.MustRegister(version.NewCollector("smokeping_exporter"))
+}
 
 func main() {
 	var (
@@ -52,9 +57,12 @@ func main() {
 	)
 
 	log.AddFlags(kingpin.CommandLine)
-	// kingpin.Version(version.Print("smokeping_exporter"))
+	kingpin.Version(version.Print("smokeping_exporter"))
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
+
+	log.Infoln("Starting smokeping_exporter", version.Info())
+	log.Infoln("Build context", version.BuildContext())
 
 	pingers := make([]*ping.Pinger, len(*hosts))
 	for i, host := range *hosts {
