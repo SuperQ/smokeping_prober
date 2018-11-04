@@ -1,0 +1,40 @@
+---
+version: 2
+
+jobs:
+  test:
+    docker:
+    - image: circleci/golang:1.11
+
+    steps:
+    - checkout
+    - run: go mod download
+    - run: make promu
+    - run: make check_license style unused test build
+    - run: rm -v smokeping_exporter
+
+  build:
+    machine: true
+    working_directory: /home/circleci/.go_workspace/src/github.com/superq/smokeping_exporter
+
+    steps:
+    - checkout
+    - run: make promu
+    - run: promu crossbuild -v
+    - persist_to_workspace:
+        root: .
+        paths:
+        - .build
+
+workflows:
+  version: 2
+  smokeping_exporter:
+    jobs:
+    - test:
+        filters:
+          tags:
+            only: /.*/
+    - build:
+        filters:
+          tags:
+            only: /.*/
