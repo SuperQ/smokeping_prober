@@ -6,11 +6,11 @@ Prometheus style "smokeping" prober.
 This prober sends a series of ICMP (or UDP) pings to a target and records the responses in Prometheus histogram metrics.
 
 ```
-usage: smokeping_exporter [<flags>] <host>
+usage: smokeping_exporter [<flags>] <hosts>...
 
 Flags:
   -h, --help              Show context-sensitive help (also try --help-long and --help-man).
-      --web.listen-address=":9100"  
+      --web.listen-address=":9374"
                           Address on which to expose metrics and web interface.
       --web.telemetry-path="/metrics"  
                           Path under which to expose metrics.
@@ -22,9 +22,10 @@ Flags:
       --log.format="logger:stderr"  
                           Set the log target and format. Example: "logger:syslog?appname=bob&local=7" or
                           "logger:stdout?json=true"
+      --version           Show application version.
 
 Args:
-  <host>  Host to ping
+  <hosts>  List of hosts to ping
 ```
 
 ## Building and running
