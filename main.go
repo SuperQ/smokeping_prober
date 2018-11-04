@@ -13,6 +13,33 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
+type hostList []string
+
+func (h *hostList) Set(value string) error {
+  if value == "" {
+    return fmt.Errorf("'%s' is not valid hostname", value)
+  } else {
+    *h = append(*h, value)
+    return nil
+  }
+}
+
+func (h *hostList) String() string {
+  return ""
+}
+
+func (h *hostList) IsCumulative() bool {
+  return true
+}
+
+func HostList(s kingpin.Settings) (target *[]string) {
+  target = new([]string)
+  s.SetValue((*hostList)(target))
+  return
+}
+
+type pingerList []ping.Pinger
+
 func main() {
 	var (
 		listenAddress = kingpin.Flag("web.listen-address", "Address on which to expose metrics and web interface.").Default(":9374").String()
@@ -21,7 +48,7 @@ func main() {
 		timeout    = kingpin.Flag("ping.timeout", "Ping timeout duration").Short('t').Default("60s").Duration()
 		interval   = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("1s").Duration()
 		privileged = kingpin.Flag("privileged", "Run in privileged ICMP mode").Default("true").Bool()
-		host       = kingpin.Arg("host", "Host to ping").Required().String()
+		hosts      = HostList(kingpin.Arg("hosts", "List of hosts to ping").Required())
 	)
 
 	log.AddFlags(kingpin.CommandLine)
@@ -29,28 +56,24 @@ func main() {
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
 
-	pinger, err := ping.NewPinger(*host)
-	if err != nil {
-		fmt.Printf("ERROR: %s\n", err.Error())
-		return
+	pingers := make([]*ping.Pinger, len(*hosts))
+	for i, host := range *hosts {
+		pinger, err := ping.NewPinger(host)
+		if err != nil {
+			fmt.Printf("ERROR: %s\n", err.Error())
+			return
+		}
+
+		pinger.Interval = *interval
+		pinger.Timeout = *timeout
+		pinger.SetPrivileged(*privileged)
+
+		go pinger.Run()
+
+		pingers[i] = pinger
 	}
 
-	pinger.OnFinish = func(stats *ping.Statistics) {
-		fmt.Printf("\n--- %s ping statistics ---\n", stats.Addr)
-		fmt.Printf("%d packets transmitted, %d packets received, %v%% packet loss\n",
-			stats.PacketsSent, stats.PacketsRecv, stats.PacketLoss)
-		fmt.Printf("round-trip min/avg/max/stddev = %v/%v/%v/%v\n",
-			stats.MinRtt, stats.AvgRtt, stats.MaxRtt, stats.StdDevRtt)
-	}
-
-	pinger.Interval = *interval
-	pinger.Timeout = *timeout
-	pinger.SetPrivileged(*privileged)
-
-	prometheus.MustRegister(NewSmokepingCollector(pinger))
-
-	fmt.Printf("PING %s (%s):\n", pinger.Addr(), pinger.IPAddr())
-	go pinger.Run()
+	prometheus.MustRegister(NewSmokepingCollector(&pingers))
 
 	http.Handle(*metricsPath, promhttp.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -63,5 +86,7 @@ func main() {
 			</html>`))
 	})
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
-	pinger.Stop()
+	for _, pinger := range pingers {
+		pinger.Stop()
+	}
 }

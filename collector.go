@@ -31,20 +31,29 @@ func init() {
 
 // SmokepingCollector collects metrics from the pinger.
 type SmokepingCollector struct {
-	pinger *ping.Pinger
+	pingers *[]*ping.Pinger
 
 	requestsSent *prometheus.Desc
 }
 
-func NewSmokepingCollector(pinger *ping.Pinger) *SmokepingCollector {
-	pinger.OnRecv = func(pkt *ping.Packet) {
-		pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Observe(pkt.Rtt.Seconds())
-		fmt.Printf("%d bytes from %s: icmp_seq=%d time=%v\n",
-			pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt)
+func NewSmokepingCollector(pingers *[]*ping.Pinger) *SmokepingCollector {
+	for _, pinger := range *pingers {
+		pinger.OnRecv = func(pkt *ping.Packet) {
+			pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Observe(pkt.Rtt.Seconds())
+			fmt.Printf("%d bytes from %s: icmp_seq=%d time=%v\n",
+				pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt)
+		}
+		pinger.OnFinish = func(stats *ping.Statistics) {
+			fmt.Printf("\n--- %s ping statistics ---\n", stats.Addr)
+			fmt.Printf("%d packets transmitted, %d packets received, %v%% packet loss\n",
+				stats.PacketsSent, stats.PacketsRecv, stats.PacketLoss)
+			fmt.Printf("round-trip min/avg/max/stddev = %v/%v/%v/%v\n",
+				stats.MinRtt, stats.AvgRtt, stats.MaxRtt, stats.StdDevRtt)
+		}
 	}
 
 	return &SmokepingCollector{
-		pinger: pinger,
+		pingers: pingers,
 		requestsSent: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "", "requests_total"),
 			"Number of ping requests sent",
@@ -59,13 +68,15 @@ func (s *SmokepingCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (s *SmokepingCollector) Collect(ch chan<- prometheus.Metric) {
-	stats := s.pinger.Statistics()
-
-	ch <- prometheus.MustNewConstMetric(
-		s.requestsSent,
-		prometheus.CounterValue,
-		float64(stats.PacketsSent),
-		stats.IPAddr.String(),
-		stats.Addr,
-	)
+	for _, pinger := range *s.pingers {
+		stats := pinger.Statistics()
+	
+		ch <- prometheus.MustNewConstMetric(
+			s.requestsSent,
+			prometheus.CounterValue,
+			float64(stats.PacketsSent),
+			stats.IPAddr.String(),
+			stats.Addr,
+		)
+	}
 }
