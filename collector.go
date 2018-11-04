@@ -1,9 +1,8 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/log"
 	"github.com/superq/go-ping"
 )
 
@@ -40,14 +39,14 @@ func NewSmokepingCollector(pingers *[]*ping.Pinger) *SmokepingCollector {
 	for _, pinger := range *pingers {
 		pinger.OnRecv = func(pkt *ping.Packet) {
 			pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Observe(pkt.Rtt.Seconds())
-			fmt.Printf("%d bytes from %s: icmp_seq=%d time=%v\n",
+			log.Debugf("%d bytes from %s: icmp_seq=%d time=%v\n",
 				pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt)
 		}
 		pinger.OnFinish = func(stats *ping.Statistics) {
-			fmt.Printf("\n--- %s ping statistics ---\n", stats.Addr)
-			fmt.Printf("%d packets transmitted, %d packets received, %v%% packet loss\n",
+			log.Debugf("\n--- %s ping statistics ---\n", stats.Addr)
+			log.Debugf("%d packets transmitted, %d packets received, %v%% packet loss\n",
 				stats.PacketsSent, stats.PacketsRecv, stats.PacketLoss)
-			fmt.Printf("round-trip min/avg/max/stddev = %v/%v/%v/%v\n",
+			log.Debugf("round-trip min/avg/max/stddev = %v/%v/%v/%v\n",
 				stats.MinRtt, stats.AvgRtt, stats.MaxRtt, stats.StdDevRtt)
 		}
 	}

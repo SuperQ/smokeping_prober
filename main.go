@@ -60,7 +60,7 @@ func main() {
 	for i, host := range *hosts {
 		pinger, err := ping.NewPinger(host)
 		if err != nil {
-			fmt.Printf("ERROR: %s\n", err.Error())
+			log.Errorf("ERROR: %s\n", err.Error())
 			return
 		}
 
