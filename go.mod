@@ -12,7 +12,7 @@ require (
 	github.com/prometheus/common v0.0.0-20181020173914-7e9e6cabbd39
 	github.com/prometheus/procfs v0.0.0-20181005140218-185b4288413d // indirect
 	github.com/sirupsen/logrus v1.2.0 // indirect
-	github.com/superq/go-ping v0.0.0-20181104154941-047489f97917
+	github.com/superq/go-ping v0.0.0-20181104213257-53547381f759
 	golang.org/x/net v0.0.0-20181102091132-c10e9556a7bc // indirect
 	golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f // indirect
 	golang.org/x/sys v0.0.0-20180906133057-8cf3aee42992 // indirect
