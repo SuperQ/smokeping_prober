@@ -14,4 +14,14 @@
 include Makefile.common
 
 DOCKER_REPO       ?= superq
-DOCKER_IMAGE_NAME ?= smokeping_exporter
+DOCKER_IMAGE_NAME ?= smokeping_prober
+
+.PHONY: build
+build: promu vendor
+	@echo ">> building binaries"
+	$(PROMU) build --prefix $(PREFIX)
+
+.PHONY: vendor
+vendor:
+	@echo ">> Running go mod venor"
+	$(GO) mod vendor
