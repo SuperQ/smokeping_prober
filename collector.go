@@ -15,9 +15,10 @@
 package main
 
 import (
+	"github.com/superq/smokeping_prober/ping"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
-	"github.com/superq/go-ping"
 )
 
 const (

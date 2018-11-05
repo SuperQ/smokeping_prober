@@ -1,4 +1,4 @@
-# smokeping_exporter
+# smokeping_prober
 Prometheus style "smokeping" prober.
 
 ## Overview
@@ -6,7 +6,7 @@ Prometheus style "smokeping" prober.
 This prober sends a series of ICMP (or UDP) pings to a target and records the responses in Prometheus histogram metrics.
 
 ```
-usage: smokeping_exporter [<flags>] <hosts>...
+usage: smokeping_prober [<flags>] <hosts>...
 
 Flags:
   -h, --help              Show context-sensitive help (also try --help-long and --help-man).
@@ -29,6 +29,13 @@ Args:
 ```
 
 ## Building and running
+
+Requires Go >= 1.11
+
+```console
+go get github.com/superq/smokeping_prober
+sudo setcap cap_net_raw=+ep smokeping_prober
+```
 
 ## Metrics
 

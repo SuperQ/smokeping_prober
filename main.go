@@ -18,11 +18,12 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/superq/smokeping_prober/ping"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/log"
 	"github.com/prometheus/common/version"
-	"github.com/superq/go-ping"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
@@ -54,7 +55,7 @@ func HostList(s kingpin.Settings) (target *[]string) {
 type pingerList []ping.Pinger
 
 func init() {
-	prometheus.MustRegister(version.NewCollector("smokeping_exporter"))
+	prometheus.MustRegister(version.NewCollector("smokeping_prober"))
 }
 
 func main() {
@@ -69,11 +70,11 @@ func main() {
 	)
 
 	log.AddFlags(kingpin.CommandLine)
-	kingpin.Version(version.Print("smokeping_exporter"))
+	kingpin.Version(version.Print("smokeping_prober"))
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
 
-	log.Infoln("Starting smokeping_exporter", version.Info())
+	log.Infoln("Starting smokeping_prober", version.Info())
 	log.Infoln("Build context", version.BuildContext())
 
 	pingers := make([]*ping.Pinger, len(*hosts))
