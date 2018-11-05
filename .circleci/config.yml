@@ -10,12 +10,12 @@ jobs:
     - checkout
     - run: go mod download
     - run: make promu
-    - run: make check_license style unused test build
-    - run: rm -v smokeping_exporter
+    - run: make style unused test build
+    - run: rm -v smokeping_prober
 
   build:
     machine: true
-    working_directory: /home/circleci/.go_workspace/src/github.com/superq/smokeping_exporter
+    working_directory: /home/circleci/.go_workspace/src/github.com/superq/smokeping_prober
 
     steps:
     - checkout
@@ -28,7 +28,7 @@ jobs:
 
 workflows:
   version: 2
-  smokeping_exporter:
+  smokeping_prober:
     jobs:
     - test:
         filters:
