@@ -1,5 +1,9 @@
+go:
+    # Whenever the Go version is updated here and
+    # .circle/config.yml should also be updated.
+    version: 1.11
 repository:
-    path: github.com/superq/smokeping_exporter
+    path: github.com/superq/smokeping_prober
 build:
     flags: -a -tags 'netgo static_build'
     ldflags: |

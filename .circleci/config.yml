@@ -1,10 +1,16 @@
 ---
-version: 2
+version: 2.1
+
+executors:
+  # Whenever the Go version is updated here and .promu.yml
+  # should also be updated.
+  golang:
+    docker:
+    - image: circleci/golang:1.11
 
 jobs:
   test:
-    docker:
-    - image: circleci/golang:1.11
+    executor: golang
 
     steps:
     - checkout
@@ -15,7 +21,6 @@ jobs:
 
   build:
     machine: true
-    working_directory: /home/circleci/.go_workspace/src/github.com/superq/smokeping_prober
 
     steps:
     - checkout
@@ -25,6 +30,9 @@ jobs:
         root: .
         paths:
         - .build
+    - store_artifacts:
+        path: .build
+        destination: /build
 
 workflows:
   version: 2
