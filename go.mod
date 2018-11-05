@@ -1,4 +1,4 @@
-module github.com/superq/smokeping_exporter
+module github.com/superq/smokeping_prober
 
 require (
 	github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc // indirect
@@ -14,6 +14,5 @@ require (
 	github.com/sirupsen/logrus v1.2.0 // indirect
 	golang.org/x/net v0.0.0-20181102091132-c10e9556a7bc
 	golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f // indirect
-	golang.org/x/sys v0.0.0-20180906133057-8cf3aee42992 // indirect
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 )
