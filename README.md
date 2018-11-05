@@ -34,12 +34,12 @@ Requires Go >= 1.11
 
 ```console
 go get github.com/superq/smokeping_prober
-sudo setcap cap_net_raw=+ep smokeping_prober
+sudo setcap cap_net_raw=+ep ${GOPATH}/bin/smokeping_prober
 ```
 
 ## Metrics
 
- Metric Name                         | Type       | Description
--------------------------------------|------------|-------------------------------------------
- smokeping\_requests\_total          | Counter    | Counter of pings sent.
- smokeping_response_duration_seconds | Histogram  | Ping response duration.
+ Metric Name                            | Type       | Description
+----------------------------------------|------------|-------------------------------------------
+ smokeping\_requests\_total             | Counter    | Counter of pings sent.
+ smokeping\_response\_duration\_seconds | Histogram  | Ping response duration.
