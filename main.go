@@ -16,7 +16,9 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"net/http"
+	"time"
 
 	"github.com/superq/smokeping_prober/ping"
 
@@ -63,7 +65,6 @@ func main() {
 		listenAddress = kingpin.Flag("web.listen-address", "Address on which to expose metrics and web interface.").Default(":9374").String()
 		metricsPath   = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
 
-		timeout    = kingpin.Flag("ping.timeout", "Ping timeout duration").Short('t').Default("60s").Duration()
 		interval   = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("1s").Duration()
 		privileged = kingpin.Flag("privileged", "Run in privileged ICMP mode").Default("true").Bool()
 		hosts      = HostList(kingpin.Arg("hosts", "List of hosts to ping").Required())
@@ -86,7 +87,7 @@ func main() {
 		}
 
 		pinger.Interval = *interval
-		pinger.Timeout = *timeout
+		pinger.Timeout = time.Duration(math.MaxInt64)
 		pinger.SetPrivileged(*privileged)
 
 		go pinger.Run()
