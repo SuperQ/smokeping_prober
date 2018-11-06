@@ -13,7 +13,7 @@
 
 include Makefile.common
 
-DOCKER_REPO       ?= superq
+DOCKER_REPO       = superq
 DOCKER_IMAGE_NAME ?= smokeping_prober
 
 .PHONY: build
