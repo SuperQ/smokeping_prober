@@ -86,7 +86,7 @@ func main() {
 		}
 
 		pinger.Interval = *interval
-		pinger.Timeout = *timeout
+		pinger.Timeout = timeout
 		pinger.SetPrivileged(*privileged)
 
 		go pinger.Run()

@@ -68,6 +68,15 @@ var (
 	ipv6Proto = map[string]string{"ip": "ip6:ipv6-icmp", "udp": "udp6"}
 )
 
+type Forever struct {
+	C <-chan int
+}
+
+func forever() *Forever {
+	C := make(chan int)
+	return &Forever{C: C}
+}
+
 // NewPinger returns a new Pinger struct pointer
 func NewPinger(addr string) (*Pinger, error) {
 	ipaddr, err := net.ResolveIPAddr("ip", addr)
@@ -86,7 +95,7 @@ func NewPinger(addr string) (*Pinger, error) {
 		ipaddr:   ipaddr,
 		addr:     addr,
 		Interval: time.Second,
-		Timeout:  time.Second * 100000,
+		Timeout:  nil,
 		Count:    -1,
 		id:       rand.Intn(0xffff),
 		network:  "udp",
@@ -103,7 +112,7 @@ type Pinger struct {
 
 	// Timeout specifies a timeout before ping exits, regardless of how many
 	// packets have been received.
-	Timeout time.Duration
+	Timeout *time.Duration
 
 	// Count tells pinger to stop after sending (and receiving) Count echo
 	// packets. If this option is not specified, pinger will operate until
@@ -289,8 +298,11 @@ func (p *Pinger) run() {
 		fmt.Println(err.Error())
 	}
 
-	timeout := time.NewTicker(p.Timeout)
-	defer timeout.Stop()
+	timeout := forever()
+	if p.Timeout != nil {
+		timeout := time.NewTicker(*p.Timeout)
+		defer timeout.Stop()
+	}
 	interval := time.NewTicker(p.Interval)
 	defer interval.Stop()
 
