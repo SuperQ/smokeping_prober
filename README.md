@@ -14,7 +14,6 @@ Flags:
                           Address on which to expose metrics and web interface.
       --web.telemetry-path="/metrics"  
                           Path under which to expose metrics.
-  -t, --ping.timeout=60s  Ping timeout duration
   -i, --ping.interval=1s  Ping interval duration
       --privileged        Run in privileged ICMP mode
       --log.level="info"  Only log messages with the given severity or above. Valid levels: [debug, info, warn,
