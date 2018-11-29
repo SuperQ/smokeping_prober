@@ -66,6 +66,7 @@ func main() {
 		metricsPath   = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
 
 		interval   = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("1s").Duration()
+		size       = kingpin.Flag("ping.size", "Ping packet size").Short('s').Default("56").Int()
 		privileged = kingpin.Flag("privileged", "Run in privileged ICMP mode").Default("true").Bool()
 		hosts      = HostList(kingpin.Arg("hosts", "List of hosts to ping").Required())
 	)
@@ -89,6 +90,7 @@ func main() {
 		pinger.Interval = *interval
 		pinger.Timeout = time.Duration(math.MaxInt64)
 		pinger.SetPrivileged(*privileged)
+		pinger.Size = *size
 
 		go pinger.Run()
 
