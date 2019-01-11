@@ -1,0 +1,13 @@
+---
+groups:
+- name: Smokeping
+  interval: 30s
+  rules:
+  - record: instance:smokeping_probe_success:ratio1m
+    expr: increase(smokeping_response_duration_seconds_count[1m]) / increase(smokeping_requests_total[1m])
+  - record: instance:smokeping_response_duration_seconds:q50
+    expr: histogram_quantile(0.50, rate(smokeping_response_duration_seconds_bucket[1m]))
+  - record: instance:smokeping_response_duration_seconds:q90
+    expr: histogram_quantile(0.90, rate(smokeping_response_duration_seconds_bucket[1m]))
+  - record: instance:smokeping_response_duration_seconds:q99
+    expr: histogram_quantile(0.99, rate(smokeping_response_duration_seconds_bucket[1m]))
