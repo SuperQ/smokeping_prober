@@ -1,6 +1,8 @@
 # smokeping_prober
 Prometheus style "smokeping" prober.
 
+![Example Graph](example-graph.png)
+
 ## Overview
 
 This prober sends a series of ICMP (or UDP) pings to a target and records the responses in Prometheus histogram metrics.
