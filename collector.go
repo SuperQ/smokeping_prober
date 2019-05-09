@@ -28,19 +28,33 @@ const (
 var (
 	labelNames = []string{"ip", "host"}
 
+	pingResponseSeconds *prometheus.HistogramVec
+
+	hasRegistered bool
+)
+
+func init() {
+	hasRegistered = false
+}
+
+func setHistogramOptions(buckets []float64) {
 	pingResponseSeconds = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
 			Name:      "response_duration_seconds",
 			Help:      "A histogram of latencies for ping responses.",
-			Buckets:   prometheus.ExponentialBuckets(0.00005, 2, 20),
+			Buckets:   buckets,
 		},
 		labelNames,
 	)
-)
+}
 
-func init() {
+func registerMetrics() {
+	if hasRegistered {
+		panic("ERROR: called registerMetrics() twice\n")
+	}
 	prometheus.MustRegister(pingResponseSeconds)
+	hasRegistered = true
 }
 
 // SmokepingCollector collects metrics from the pinger.

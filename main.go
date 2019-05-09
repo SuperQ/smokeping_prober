@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/superq/smokeping_prober/ping"
@@ -60,11 +62,25 @@ func init() {
 	prometheus.MustRegister(version.NewCollector("smokeping_prober"))
 }
 
+func parseBuckets(buckets *string) (bucketlist []float64) {
+	bucketstrings := strings.Split(*buckets, ",")
+	bucketlist = make([]float64, len(bucketstrings))
+	for n := 0; n < len(bucketstrings); n++ {
+		value, err := strconv.ParseFloat(bucketstrings[n], 64)
+		if err != nil {
+			panic(err)
+		}
+		bucketlist[n] = value
+	}
+	return bucketlist
+}
+
 func main() {
 	var (
 		listenAddress = kingpin.Flag("web.listen-address", "Address on which to expose metrics and web interface.").Default(":9374").String()
 		metricsPath   = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
 
+		buckets    = kingpin.Flag("buckets", "A comma delimited list of buckets to use").String()
 		interval   = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("1s").Duration()
 		privileged = kingpin.Flag("privileged", "Run in privileged ICMP mode").Default("true").Bool()
 		hosts      = HostList(kingpin.Arg("hosts", "List of hosts to ping").Required())
@@ -77,6 +93,14 @@ func main() {
 
 	log.Infoln("Starting smokeping_prober", version.Info())
 	log.Infoln("Build context", version.BuildContext())
+	var bucketlist []float64
+	if len(*buckets) == 0 {
+		bucketlist = prometheus.ExponentialBuckets(0.00005, 2, 20)
+	} else {
+		bucketlist = parseBuckets(buckets)
+	}
+	setHistogramOptions(bucketlist)
+	registerMetrics()
 
 	pingers := make([]*ping.Pinger, len(*hosts))
 	for i, host := range *hosts {
