@@ -27,18 +27,13 @@ const (
 
 var (
 	labelNames = []string{"ip", "host"}
-
-	pingResponseSeconds *prometheus.HistogramVec
-
-	hasRegistered bool
 )
 
 func init() {
-	hasRegistered = false
 }
 
-func setHistogramOptions(buckets []float64) {
-	pingResponseSeconds = prometheus.NewHistogramVec(
+func newPingResponseHistogram(buckets []float64) **prometheus.HistogramVec {
+	pingResponseSeconds := prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
 			Name:      "response_duration_seconds",
@@ -47,14 +42,7 @@ func setHistogramOptions(buckets []float64) {
 		},
 		labelNames,
 	)
-}
-
-func registerMetrics() {
-	if hasRegistered {
-		panic("ERROR: called registerMetrics() twice\n")
-	}
-	prometheus.MustRegister(pingResponseSeconds)
-	hasRegistered = true
+	return &pingResponseSeconds
 }
 
 // SmokepingCollector collects metrics from the pinger.
@@ -64,7 +52,7 @@ type SmokepingCollector struct {
 	requestsSent *prometheus.Desc
 }
 
-func NewSmokepingCollector(pingers *[]*ping.Pinger) *SmokepingCollector {
+func NewSmokepingCollector(pingers *[]*ping.Pinger, pingResponseSeconds prometheus.HistogramVec) *SmokepingCollector {
 	for _, pinger := range *pingers {
 		pinger.OnRecv = func(pkt *ping.Packet) {
 			pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Observe(pkt.Rtt.Seconds())

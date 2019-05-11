@@ -62,17 +62,17 @@ func init() {
 	prometheus.MustRegister(version.NewCollector("smokeping_prober"))
 }
 
-func parseBuckets(buckets *string) (bucketlist []float64) {
+func parseBuckets(buckets *string) ([]float64, error) {
 	bucketstrings := strings.Split(*buckets, ",")
-	bucketlist = make([]float64, len(bucketstrings))
+	bucketlist := make([]float64, len(bucketstrings))
 	for n := 0; n < len(bucketstrings); n++ {
 		value, err := strconv.ParseFloat(bucketstrings[n], 64)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
 		bucketlist[n] = value
 	}
-	return bucketlist
+	return bucketlist, nil
 }
 
 func main() {
@@ -97,10 +97,15 @@ func main() {
 	if len(*buckets) == 0 {
 		bucketlist = prometheus.ExponentialBuckets(0.00005, 2, 20)
 	} else {
-		bucketlist = parseBuckets(buckets)
+		var err error
+		bucketlist, err = parseBuckets(buckets)
+		if err != nil {
+			log.Errorf("ERROR: %s\n", err.Error())
+			return
+		}
 	}
-	setHistogramOptions(bucketlist)
-	registerMetrics()
+	pingResponseSeconds := newPingResponseHistogram(bucketlist)
+	prometheus.MustRegister(*pingResponseSeconds)
 
 	pingers := make([]*ping.Pinger, len(*hosts))
 	for i, host := range *hosts {
@@ -119,7 +124,7 @@ func main() {
 		pingers[i] = pinger
 	}
 
-	prometheus.MustRegister(NewSmokepingCollector(&pingers))
+	prometheus.MustRegister(NewSmokepingCollector(&pingers, **pingResponseSeconds))
 
 	http.Handle(*metricsPath, promhttp.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
