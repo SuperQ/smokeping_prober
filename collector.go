@@ -29,11 +29,8 @@ var (
 	labelNames = []string{"ip", "host"}
 )
 
-func init() {
-}
-
-func newPingResponseHistogram(buckets []float64) **prometheus.HistogramVec {
-	pingResponseSeconds := prometheus.NewHistogramVec(
+func newPingResponseHistogram(buckets []float64) *prometheus.HistogramVec {
+	return prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
 			Name:      "response_duration_seconds",
@@ -42,7 +39,6 @@ func newPingResponseHistogram(buckets []float64) **prometheus.HistogramVec {
 		},
 		labelNames,
 	)
-	return &pingResponseSeconds
 }
 
 // SmokepingCollector collects metrics from the pinger.
