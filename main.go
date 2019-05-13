@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/superq/smokeping_prober/ping"
@@ -60,11 +62,25 @@ func init() {
 	prometheus.MustRegister(version.NewCollector("smokeping_prober"))
 }
 
+func parseBuckets(buckets string) ([]float64, error) {
+	bucketstrings := strings.Split(buckets, ",")
+	bucketlist := make([]float64, len(bucketstrings))
+	for i := range bucketstrings {
+		value, err := strconv.ParseFloat(bucketstrings[i], 64)
+		if err != nil {
+			return nil, err
+		}
+		bucketlist[i] = value
+	}
+	return bucketlist, nil
+}
+
 func main() {
 	var (
 		listenAddress = kingpin.Flag("web.listen-address", "Address on which to expose metrics and web interface.").Default(":9374").String()
 		metricsPath   = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
 
+		buckets    = kingpin.Flag("buckets", "A comma delimited list of buckets to use").String()
 		interval   = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("1s").Duration()
 		privileged = kingpin.Flag("privileged", "Run in privileged ICMP mode").Default("true").Bool()
 		hosts      = HostList(kingpin.Arg("hosts", "List of hosts to ping").Required())
@@ -77,6 +93,19 @@ func main() {
 
 	log.Infoln("Starting smokeping_prober", version.Info())
 	log.Infoln("Build context", version.BuildContext())
+	var bucketlist []float64
+	if len(*buckets) == 0 {
+		bucketlist = prometheus.ExponentialBuckets(0.00005, 2, 20)
+	} else {
+		var err error
+		bucketlist, err = parseBuckets(*buckets)
+		if err != nil {
+			log.Errorf("ERROR: %s\n", err.Error())
+			return
+		}
+	}
+	pingResponseSeconds := newPingResponseHistogram(bucketlist)
+	prometheus.MustRegister(pingResponseSeconds)
 
 	pingers := make([]*ping.Pinger, len(*hosts))
 	for i, host := range *hosts {
@@ -95,7 +124,7 @@ func main() {
 		pingers[i] = pinger
 	}
 
-	prometheus.MustRegister(NewSmokepingCollector(&pingers))
+	prometheus.MustRegister(NewSmokepingCollector(&pingers, *pingResponseSeconds))
 
 	http.Handle(*metricsPath, promhttp.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

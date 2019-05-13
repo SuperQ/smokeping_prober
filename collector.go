@@ -27,20 +27,18 @@ const (
 
 var (
 	labelNames = []string{"ip", "host"}
+)
 
-	pingResponseSeconds = prometheus.NewHistogramVec(
+func newPingResponseHistogram(buckets []float64) *prometheus.HistogramVec {
+	return prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
 			Name:      "response_duration_seconds",
 			Help:      "A histogram of latencies for ping responses.",
-			Buckets:   prometheus.ExponentialBuckets(0.00005, 2, 20),
+			Buckets:   buckets,
 		},
 		labelNames,
 	)
-)
-
-func init() {
-	prometheus.MustRegister(pingResponseSeconds)
 }
 
 // SmokepingCollector collects metrics from the pinger.
@@ -50,7 +48,7 @@ type SmokepingCollector struct {
 	requestsSent *prometheus.Desc
 }
 
-func NewSmokepingCollector(pingers *[]*ping.Pinger) *SmokepingCollector {
+func NewSmokepingCollector(pingers *[]*ping.Pinger, pingResponseSeconds prometheus.HistogramVec) *SmokepingCollector {
 	for _, pinger := range *pingers {
 		pinger.OnRecv = func(pkt *ping.Packet) {
 			pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Observe(pkt.Rtt.Seconds())

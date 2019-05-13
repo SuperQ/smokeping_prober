@@ -16,6 +16,7 @@ Flags:
                           Address on which to expose metrics and web interface.
       --web.telemetry-path="/metrics"  
                           Path under which to expose metrics.
+      --buckets=BUCKETS   A comma delimited list of buckets to use
   -i, --ping.interval=1s  Ping interval duration
       --privileged        Run in privileged ICMP mode
       --log.level="info"  Only log messages with the given severity or above. Valid levels: [debug, info, warn,
