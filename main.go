@@ -31,6 +31,11 @@ import (
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
+var (
+	// Generated with: prometheus.ExponentialBuckets(0.00005, 2, 20)
+	defaultBuckets = "5e-05,0.0001,0.0002,0.0004,0.0008,0.0016,0.0032,0.0064,0.0128,0.0256,0.0512,0.1024,0.2048,0.4096,0.8192,1.6384,3.2768,6.5536,13.1072,26.2144"
+)
+
 type hostList []string
 
 func (h *hostList) Set(value string) error {
@@ -80,7 +85,7 @@ func main() {
 		listenAddress = kingpin.Flag("web.listen-address", "Address on which to expose metrics and web interface.").Default(":9374").String()
 		metricsPath   = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
 
-		buckets    = kingpin.Flag("buckets", "A comma delimited list of buckets to use").String()
+		buckets    = kingpin.Flag("buckets", "A comma delimited list of buckets to use").Default(defaultBuckets).String()
 		interval   = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("1s").Duration()
 		privileged = kingpin.Flag("privileged", "Run in privileged ICMP mode").Default("true").Bool()
 		hosts      = HostList(kingpin.Arg("hosts", "List of hosts to ping").Required())
@@ -93,16 +98,10 @@ func main() {
 
 	log.Infoln("Starting smokeping_prober", version.Info())
 	log.Infoln("Build context", version.BuildContext())
-	var bucketlist []float64
-	if len(*buckets) == 0 {
-		bucketlist = prometheus.ExponentialBuckets(0.00005, 2, 20)
-	} else {
-		var err error
-		bucketlist, err = parseBuckets(*buckets)
-		if err != nil {
-			log.Errorf("ERROR: %s\n", err.Error())
-			return
-		}
+	bucketlist, err := parseBuckets(*buckets)
+	if err != nil {
+		log.Errorf("failed to parse buckets: %s\n", err.Error())
+		return
 	}
 	pingResponseSeconds := newPingResponseHistogram(bucketlist)
 	prometheus.MustRegister(pingResponseSeconds)
@@ -111,7 +110,7 @@ func main() {
 	for i, host := range *hosts {
 		pinger, err := ping.NewPinger(host)
 		if err != nil {
-			log.Errorf("ERROR: %s\n", err.Error())
+			log.Errorf("failed to create pinger: %s\n", err.Error())
 			return
 		}
 
@@ -119,6 +118,7 @@ func main() {
 		pinger.Timeout = time.Duration(math.MaxInt64)
 		pinger.SetPrivileged(*privileged)
 
+		log.Infof("Starting prober for %s", host)
 		go pinger.Run()
 
 		pingers[i] = pinger
@@ -136,6 +136,7 @@ func main() {
 			</body>
 			</html>`))
 	})
+	log.Infof("Listening on %s", *listenAddress)
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 	for _, pinger := range pingers {
 		pinger.Stop()

@@ -6,7 +6,7 @@ executors:
   # should also be updated.
   golang:
     docker:
-    - image: circleci/golang:1.11
+    - image: circleci/golang:1.12
 
 jobs:
   test:
@@ -40,9 +40,6 @@ jobs:
     steps:
     - checkout
     - setup_remote_docker
-    - run: mkdir -v -p ${HOME}/bin
-    - run: curl -L 'https://github.com/aktau/github-release/releases/download/v0.7.2/linux-amd64-github-release.tar.bz2' | tar xvjf - --strip-components 3 -C ${HOME}/bin
-    - run: echo 'export PATH=${HOME}/bin:${PATH}' >> ${BASH_ENV}
     - attach_workspace:
         at: .
     - run: make promu
