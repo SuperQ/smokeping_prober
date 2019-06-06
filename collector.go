@@ -15,7 +15,7 @@
 package main
 
 import (
-	"github.com/superq/smokeping_prober/ping"
+	"github.com/sparrc/go-ping"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
@@ -27,7 +27,20 @@ const (
 
 var (
 	labelNames = []string{"ip", "host"}
+
+	pingResponseTtl = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "response_ttl",
+			Help:      "The last response Time To Live (TTL).",
+		},
+		labelNames,
+	)
 )
+
+func init() {
+	prometheus.MustRegister(pingResponseTtl)
+}
 
 func newPingResponseHistogram(buckets []float64) *prometheus.HistogramVec {
 	return prometheus.NewHistogramVec(
@@ -52,8 +65,9 @@ func NewSmokepingCollector(pingers *[]*ping.Pinger, pingResponseSeconds promethe
 	for _, pinger := range *pingers {
 		pinger.OnRecv = func(pkt *ping.Packet) {
 			pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Observe(pkt.Rtt.Seconds())
-			log.Debugf("%d bytes from %s: icmp_seq=%d time=%v\n",
-				pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt)
+			pingResponseTtl.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Set(float64(pkt.Ttl))
+			log.Debugf("%d bytes from %s: icmp_seq=%d time=%v ttl=%v\n",
+				pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt, pkt.Ttl)
 		}
 		pinger.OnFinish = func(stats *ping.Statistics) {
 			log.Debugf("\n--- %s ping statistics ---\n", stats.Addr)
