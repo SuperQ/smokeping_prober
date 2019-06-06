@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/superq/smokeping_prober/ping"
+	"github.com/sparrc/go-ping"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
