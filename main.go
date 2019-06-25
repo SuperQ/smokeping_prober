@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	_ "net/http/pprof"
 	"strconv"
 	"strings"
 	"time"
