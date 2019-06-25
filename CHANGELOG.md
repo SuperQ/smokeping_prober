@@ -9,6 +9,12 @@
 * [ENHANCEMENT]
 * [BUGFIX]
 
+## 0.3.0 / 2019-06-25
+
+* [FEATURE] Enable pprof
+* [FEATURE] Add TTL monitoring #20
+* [ENHANCEMENT] Update to latest upstream go-ping library #20
+
 ## 0.2.0 / 2019-05-14
 
 * [FEATURE] Add example rules file. #12
