@@ -62,8 +62,6 @@ func HostList(s kingpin.Settings) (target *[]string) {
 	return
 }
 
-type pingerList []ping.Pinger
-
 func init() {
 	prometheus.MustRegister(version.NewCollector("smokeping_prober"))
 }
