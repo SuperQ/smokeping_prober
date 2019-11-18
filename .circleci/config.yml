@@ -40,7 +40,7 @@ jobs:
     steps:
     - checkout
     - setup_remote_docker:
-        version: 18.09.3
+        version: 18.06.0-ce
     - attach_workspace:
         at: .
     - run: make promu
@@ -68,7 +68,7 @@ jobs:
     steps:
     - checkout
     - setup_remote_docker:
-        version: 18.09.3
+        version: 18.06.0-ce
     - attach_workspace:
         at: .
     - run: make docker

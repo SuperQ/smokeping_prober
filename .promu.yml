@@ -1,11 +1,11 @@
 go:
     # Whenever the Go version is updated here and
     # .circle/config.yml should also be updated.
-    version: 1.12
+    version: 1.13
 repository:
     path: github.com/superq/smokeping_prober
 build:
-    flags: -a -tags 'netgo static_build'
+    flags: -mod=vendor -a -tags 'netgo static_build'
     ldflags: |
         -X github.com/prometheus/common/version.Version={{.Version}}
         -X github.com/prometheus/common/version.Revision={{.Revision}}
