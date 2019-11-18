@@ -39,7 +39,8 @@ jobs:
 
     steps:
     - checkout
-    - setup_remote_docker
+    - setup_remote_docker:
+        version: 18.09.3
     - attach_workspace:
         at: .
     - run: make promu
@@ -66,14 +67,15 @@ jobs:
 
     steps:
     - checkout
-    - setup_remote_docker
+    - setup_remote_docker:
+        version: 18.09.3
     - attach_workspace:
         at: .
-    - run: make docker DOCKER_REPO=quay.io/superq
+    - run: make docker
     - run: docker images
     - run: docker login -u $QUAY_LOGIN -p $QUAY_PASSWORD quay.io
-    - run: make docker-publish DOCKER_REPO=quay.io/superq
-    - run: make docker-manifest DOCKER_REPO=quay.io/superq
+    - run: make docker-publish
+    - run: make docker-manifest
 
 workflows:
   version: 2
