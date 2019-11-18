@@ -11,10 +11,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-include Makefile.common
+DOCKER_ARCHS      ?= amd64 armv7 arm64
+DOCKER_REPO       ?= quay.io/superq
+DOCKER_IMAGE_NAME ?= smokeping-prober
 
-DOCKER_REPO       = superq
-DOCKER_IMAGE_NAME ?= smokeping_prober
+include Makefile.common
 
 .PHONY: build
 build: promu vendor
