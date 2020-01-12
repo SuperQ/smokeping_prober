@@ -36,10 +36,17 @@ var (
 		},
 		labelNames,
 	)
+	summary = prometheus.NewSummaryVec(prometheus.SummaryOpts{
+		Name:       "smokeping_response_latency_summary",
+		Help:       "Summary for ping response latencies",
+		Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.95: 0.005, 0.99: 0.001},
+	},
+		labelNames,
+	)
 )
 
 func init() {
-	prometheus.MustRegister(pingResponseTtl)
+	prometheus.MustRegister(pingResponseTtl, summary)
 }
 
 func newPingResponseHistogram(buckets []float64) *prometheus.HistogramVec {
@@ -64,6 +71,7 @@ type SmokepingCollector struct {
 func NewSmokepingCollector(pingers *[]*ping.Pinger, pingResponseSeconds prometheus.HistogramVec) *SmokepingCollector {
 	for _, pinger := range *pingers {
 		pinger.OnRecv = func(pkt *ping.Packet) {
+			summary.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Observe(pkt.Rtt.Seconds())
 			pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Observe(pkt.Rtt.Seconds())
 			pingResponseTtl.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Set(float64(pkt.Ttl))
 			log.Debugf("%d bytes from %s: icmp_seq=%d time=%v ttl=%v\n",
