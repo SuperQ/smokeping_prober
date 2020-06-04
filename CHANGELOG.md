@@ -1,13 +1,13 @@
 ## master / unreleased
 
-### **Breaking changes**
-
-### Changes
-
 * [CHANGE]
 * [FEATURE]
 * [ENHANCEMENT]
 * [BUGFIX]
+
+## 0.3.1 / 2020-06-04
+
+Rebuild with latest Go / vendoring.
 
 ## 0.3.0 / 2019-06-25
 
