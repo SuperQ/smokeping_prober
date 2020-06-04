@@ -35,7 +35,6 @@ workflows:
           tags:
             only: /.*/
     - prometheus/publish_master:
-        context: org-context
         docker_hub_organization:
         quay_io_organization: prometheuscommunity
         requires:
@@ -45,7 +44,6 @@ workflows:
           branches:
             only: master
     - prometheus/publish_release:
-        context: org-context
         docker_hub_organization:
         quay_io_organization: prometheuscommunity
         requires:
