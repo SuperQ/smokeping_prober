@@ -35,8 +35,8 @@ workflows:
           tags:
             only: /.*/
     - prometheus/publish_master:
-        docker_hub_organization:
-        quay_io_organization: prometheuscommunity
+        docker_hub_organization: superque
+        quay_io_organization: superq
         requires:
         - test
         - build
@@ -44,8 +44,8 @@ workflows:
           branches:
             only: master
     - prometheus/publish_release:
-        docker_hub_organization:
-        quay_io_organization: prometheuscommunity
+        docker_hub_organization: superque
+        quay_io_organization: superq
         requires:
         - test
         - build
