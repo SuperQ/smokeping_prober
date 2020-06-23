@@ -56,30 +56,32 @@ func newPingResponseHistogram(buckets []float64) *prometheus.HistogramVec {
 
 // SmokepingCollector collects metrics from the pinger.
 type SmokepingCollector struct {
-	pingers *[]*ping.Pinger
+	hostPingers *[]*HostPinger
 
 	requestsSent *prometheus.Desc
 }
 
-func NewSmokepingCollector(pingers *[]*ping.Pinger, pingResponseSeconds prometheus.HistogramVec) *SmokepingCollector {
-	for _, pinger := range *pingers {
-		pinger.OnRecv = func(pkt *ping.Packet) {
-			pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Observe(pkt.Rtt.Seconds())
-			pingResponseTtl.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Set(float64(pkt.Ttl))
-			log.Debugf("%d bytes from %s: icmp_seq=%d time=%v ttl=%v\n",
-				pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt, pkt.Ttl)
-		}
-		pinger.OnFinish = func(stats *ping.Statistics) {
-			log.Debugf("\n--- %s ping statistics ---\n", stats.Addr)
-			log.Debugf("%d packets transmitted, %d packets received, %v%% packet loss\n",
-				stats.PacketsSent, stats.PacketsRecv, stats.PacketLoss)
-			log.Debugf("round-trip min/avg/max/stddev = %v/%v/%v/%v\n",
-				stats.MinRtt, stats.AvgRtt, stats.MaxRtt, stats.StdDevRtt)
+func NewSmokepingCollector(hostPingers *[]*HostPinger, pingResponseSeconds prometheus.HistogramVec) *SmokepingCollector {
+	for _, hostPinger := range *hostPingers {
+		for _, pinger := range hostPinger.Pingers {
+			pinger.OnRecv = func(pkt *ping.Packet) {
+				pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), hostPinger.Host).Observe(pkt.Rtt.Seconds())
+				pingResponseTtl.WithLabelValues(pkt.IPAddr.String(), hostPinger.Host).Set(float64(pkt.Ttl))
+				log.Debugf("%d bytes from %s: icmp_seq=%d time=%v ttl=%v\n",
+					pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt, pkt.Ttl)
+			}
+			pinger.OnFinish = func(stats *ping.Statistics) {
+				log.Debugf("\n--- %s ping statistics ---\n", stats.Addr)
+				log.Debugf("%d packets transmitted, %d packets received, %v%% packet loss\n",
+					stats.PacketsSent, stats.PacketsRecv, stats.PacketLoss)
+				log.Debugf("round-trip min/avg/max/stddev = %v/%v/%v/%v\n",
+					stats.MinRtt, stats.AvgRtt, stats.MaxRtt, stats.StdDevRtt)
+			}
 		}
 	}
 
 	return &SmokepingCollector{
-		pingers: pingers,
+		hostPingers: hostPingers,
 		requestsSent: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "", "requests_total"),
 			"Number of ping requests sent",
@@ -94,15 +96,17 @@ func (s *SmokepingCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (s *SmokepingCollector) Collect(ch chan<- prometheus.Metric) {
-	for _, pinger := range *s.pingers {
-		stats := pinger.Statistics()
+	for _, hostPinger := range *s.hostPingers {
+		for _, pinger := range hostPinger.Pingers {
+			stats := pinger.Statistics()
 
-		ch <- prometheus.MustNewConstMetric(
-			s.requestsSent,
-			prometheus.CounterValue,
-			float64(stats.PacketsSent),
-			stats.IPAddr.String(),
-			stats.Addr,
-		)
+			ch <- prometheus.MustNewConstMetric(
+				s.requestsSent,
+				prometheus.CounterValue,
+				float64(stats.PacketsSent),
+				stats.IPAddr.String(),
+				hostPinger.Host,
+			)
+		}
 	}
 }

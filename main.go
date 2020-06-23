@@ -17,6 +17,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"strconv"
@@ -38,6 +39,11 @@ var (
 )
 
 type hostList []string
+
+type HostPinger struct {
+	Host    string
+	Pingers []*ping.Pinger
+}
 
 func (h *hostList) Set(value string) error {
 	if value == "" {
@@ -79,6 +85,33 @@ func parseBuckets(buckets string) ([]float64, error) {
 	return bucketlist, nil
 }
 
+func createPingers(host string, interval time.Duration, privileged bool) (*HostPinger, error) {
+	addresses, err := net.LookupIP(host)
+	if err != nil {
+		return nil, err
+	}
+
+	pingers := make([]*ping.Pinger, len(addresses))
+	for index, address := range addresses {
+		pinger, err := ping.NewPinger(address.String())
+		if err != nil {
+			return nil, fmt.Errorf("failed to create pinger for host %s (%v): %v", host, address, err)
+		}
+		pinger.Interval = interval
+		pinger.Timeout = time.Duration(math.MaxInt64)
+		pinger.SetPrivileged(privileged)
+
+		log.Infof("Starting prober for %s (%v)", host, address)
+		go pinger.Run()
+
+		pingers[index] = pinger
+	}
+	return &HostPinger{
+		Host:    host,
+		Pingers: pingers,
+	}, nil
+}
+
 func main() {
 	var (
 		listenAddress = kingpin.Flag("web.listen-address", "Address on which to expose metrics and web interface.").Default(":9374").String()
@@ -105,25 +138,18 @@ func main() {
 	pingResponseSeconds := newPingResponseHistogram(bucketlist)
 	prometheus.MustRegister(pingResponseSeconds)
 
-	pingers := make([]*ping.Pinger, len(*hosts))
-	for i, host := range *hosts {
-		pinger, err := ping.NewPinger(host)
+	hostPingers := make([]*HostPinger, len(*hosts))
+	for index, host := range *hosts {
+		hostPinger, err := createPingers(host, *interval, *privileged)
 		if err != nil {
-			log.Errorf("failed to create pinger: %s\n", err.Error())
+			log.Errorf("failed to create pingers for host %s\n", err.Error())
 			return
 		}
 
-		pinger.Interval = *interval
-		pinger.Timeout = time.Duration(math.MaxInt64)
-		pinger.SetPrivileged(*privileged)
-
-		log.Infof("Starting prober for %s", host)
-		go pinger.Run()
-
-		pingers[i] = pinger
+		hostPingers[index] = hostPinger
 	}
 
-	prometheus.MustRegister(NewSmokepingCollector(&pingers, *pingResponseSeconds))
+	prometheus.MustRegister(NewSmokepingCollector(&hostPingers, *pingResponseSeconds))
 
 	http.Handle(*metricsPath, promhttp.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -137,7 +163,9 @@ func main() {
 	})
 	log.Infof("Listening on %s", *listenAddress)
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
-	for _, pinger := range pingers {
-		pinger.Stop()
+	for _, hostPinger := range hostPingers {
+		for _, pinger := range hostPinger.Pingers {
+			pinger.Stop()
+		}
 	}
 }
