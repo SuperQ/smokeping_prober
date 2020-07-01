@@ -41,8 +41,8 @@ var (
 type hostList []string
 
 type HostPinger struct {
-	Host    string
-	Pingers []*ping.Pinger
+	Host   string
+	Pinger *ping.Pinger
 }
 
 func (h *hostList) Set(value string) error {
@@ -85,13 +85,13 @@ func parseBuckets(buckets string) ([]float64, error) {
 	return bucketlist, nil
 }
 
-func createPingers(host string, interval time.Duration, privileged bool) (*HostPinger, error) {
+func createPingers(host string, interval time.Duration, privileged bool) ([]*HostPinger, error) {
 	addresses, err := net.LookupIP(host)
 	if err != nil {
 		return nil, err
 	}
 
-	pingers := make([]*ping.Pinger, len(addresses))
+	pingers := make([]*HostPinger, len(addresses))
 	for index, address := range addresses {
 		pinger, err := ping.NewPinger(address.String())
 		if err != nil {
@@ -104,12 +104,12 @@ func createPingers(host string, interval time.Duration, privileged bool) (*HostP
 		log.Infof("Starting prober for %s (%v)", host, address)
 		go pinger.Run()
 
-		pingers[index] = pinger
+		pingers[index] = &HostPinger{
+			Host:   host,
+			Pinger: pinger,
+		}
 	}
-	return &HostPinger{
-		Host:    host,
-		Pingers: pingers,
-	}, nil
+	return pingers, nil
 }
 
 func main() {
@@ -138,15 +138,15 @@ func main() {
 	pingResponseSeconds := newPingResponseHistogram(bucketlist)
 	prometheus.MustRegister(pingResponseSeconds)
 
-	hostPingers := make([]*HostPinger, len(*hosts))
-	for index, host := range *hosts {
-		hostPinger, err := createPingers(host, *interval, *privileged)
+	hostPingers := make([]*HostPinger, 0, len(*hosts))
+	for _, host := range *hosts {
+		pingersForHost, err := createPingers(host, *interval, *privileged)
 		if err != nil {
 			log.Errorf("failed to create pingers for host %s\n", err.Error())
 			return
 		}
 
-		hostPingers[index] = hostPinger
+		hostPingers = append(hostPingers, pingersForHost...)
 	}
 
 	prometheus.MustRegister(NewSmokepingCollector(&hostPingers, *pingResponseSeconds))
@@ -164,8 +164,6 @@ func main() {
 	log.Infof("Listening on %s", *listenAddress)
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 	for _, hostPinger := range hostPingers {
-		for _, pinger := range hostPinger.Pingers {
-			pinger.Stop()
-		}
+		hostPinger.Pinger.Stop()
 	}
 }
