@@ -107,11 +107,15 @@ func main() {
 
 	pingers := make([]*ping.Pinger, len(*hosts))
 	for i, host := range *hosts {
-		pinger, err := ping.NewPinger(host)
+		pinger := ping.New(host)
+
+		err := pinger.Resolve()
 		if err != nil {
-			log.Errorf("failed to create pinger: %s\n", err.Error())
+			log.Errorf("failed to resolve pinger: %s\n", err.Error())
 			return
 		}
+
+		log.Infof("Resolved %s as %s", host, pinger.IPAddr())
 
 		pinger.Interval = *interval
 		pinger.Timeout = time.Duration(math.MaxInt64)
