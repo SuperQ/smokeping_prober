@@ -58,7 +58,7 @@ func newPingResponseHistogram(buckets []float64) *prometheus.HistogramVec {
 type SmokepingCollector struct {
 	pingers *[]*ping.Pinger
 
-	requestsSent *prometheus.Desc
+	requestsSent, responsesRecv *prometheus.Desc
 }
 
 func NewSmokepingCollector(pingers *[]*ping.Pinger, pingResponseSeconds prometheus.HistogramVec) *SmokepingCollector {
@@ -86,11 +86,18 @@ func NewSmokepingCollector(pingers *[]*ping.Pinger, pingResponseSeconds promethe
 			labelNames,
 			nil,
 		),
+		responsesRecv: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "responses_total"),
+			"Number of ping responses received",
+			labelNames,
+			nil,
+		),
 	}
 }
 
 func (s *SmokepingCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- s.requestsSent
+	ch <- s.responsesRecv
 }
 
 func (s *SmokepingCollector) Collect(ch chan<- prometheus.Metric) {
@@ -101,6 +108,13 @@ func (s *SmokepingCollector) Collect(ch chan<- prometheus.Metric) {
 			s.requestsSent,
 			prometheus.CounterValue,
 			float64(stats.PacketsSent),
+			stats.IPAddr.String(),
+			stats.Addr,
+		)
+		ch <- prometheus.MustNewConstMetric(
+			s.responsesRecv,
+			prometheus.CounterValue,
+			float64(stats.PacketsRecv),
 			stats.IPAddr.String(),
 			stats.Addr,
 		)

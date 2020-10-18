@@ -44,4 +44,5 @@ sudo setcap cap_net_raw=+ep ${GOPATH}/bin/smokeping_prober
  Metric Name                            | Type       | Description
 ----------------------------------------|------------|-------------------------------------------
  smokeping\_requests\_total             | Counter    | Counter of pings sent.
+ smokeping\_responses\_total            | Counter    | Counter of responses received.
  smokeping\_response\_duration\_seconds | Histogram  | Ping response duration.
