@@ -1,6 +1,6 @@
 go:
   # This must match .circle/config.yml.
-  version: 1.14
+  version: 1.15
 repository:
   path: github.com/superq/smokeping_prober
 build:
@@ -15,22 +15,3 @@ build:
 tarball:
   files:
   - LICENSE
-crossbuild:
-  platforms:
-  - darwin/amd64
-  - dragonfly/amd64
-  - freebsd/amd64
-  - freebsd/arm
-  - linux/amd64
-  - linux/arm
-  - linux/arm64
-  - linux/mips64
-  - linux/mips64le
-  - linux/ppc64
-  - linux/ppc64le
-  - linux/s390x
-  - netbsd/amd64
-  - netbsd/arm
-  - openbsd/amd64
-  - openbsd/arm
-  - windows/amd64
