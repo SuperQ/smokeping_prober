@@ -18,6 +18,7 @@ import (
 	"github.com/go-ping/ping"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/common/log"
 )
 
@@ -28,7 +29,7 @@ const (
 var (
 	labelNames = []string{"ip", "host"}
 
-	pingResponseTtl = prometheus.NewGaugeVec(
+	pingResponseTtl = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "response_ttl",
@@ -36,11 +37,15 @@ var (
 		},
 		labelNames,
 	)
+	pingResponseDuplicates = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "response_duplicates_total",
+			Help:      "The number of duplicated response packets.",
+		},
+		labelNames,
+	)
 )
-
-func init() {
-	prometheus.MustRegister(pingResponseTtl)
-}
 
 func newPingResponseHistogram(buckets []float64) *prometheus.HistogramVec {
 	return prometheus.NewHistogramVec(
@@ -63,10 +68,22 @@ type SmokepingCollector struct {
 
 func NewSmokepingCollector(pingers *[]*ping.Pinger, pingResponseSeconds prometheus.HistogramVec) *SmokepingCollector {
 	for _, pinger := range *pingers {
+		// Init all metrics to 0s.
+		ipAddr := pinger.IPAddr().String()
+		pingResponseDuplicates.WithLabelValues(ipAddr, pinger.Addr())
+		pingResponseSeconds.WithLabelValues(ipAddr, pinger.Addr())
+		pingResponseTtl.WithLabelValues(ipAddr, pinger.Addr())
+
+		// Setup handler functions.
 		pinger.OnRecv = func(pkt *ping.Packet) {
 			pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Observe(pkt.Rtt.Seconds())
 			pingResponseTtl.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Set(float64(pkt.Ttl))
 			log.Debugf("%d bytes from %s: icmp_seq=%d time=%v ttl=%v\n",
+				pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt, pkt.Ttl)
+		}
+		pinger.OnDuplicateRecv = func(pkt *ping.Packet) {
+			pingResponseDuplicates.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Inc()
+			log.Debugf("%d bytes from %s: icmp_seq=%d time=%v ttl=%v (DUP!)\n",
 				pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt, pkt.Ttl)
 		}
 		pinger.OnFinish = func(stats *ping.Statistics) {
