@@ -5,6 +5,8 @@
 * [ENHANCEMENT]
 * [BUGFIX]
 
+## 0.4.0 / 2021-01-31
+
 * [FEATURE] Add support for duplicate packet detection
 
 ## 0.3.1 / 2020-06-04
