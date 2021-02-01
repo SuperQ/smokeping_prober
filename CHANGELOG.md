@@ -5,6 +5,8 @@
 * [ENHANCEMENT]
 * [BUGFIX]
 
+* [ENHANCEMENT] Smooth out pingers over the interval
+
 ## 0.4.0 / 2021-01-31
 
 * [FEATURE] Add support for duplicate packet detection
