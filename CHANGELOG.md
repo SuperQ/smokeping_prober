@@ -5,6 +5,8 @@
 * [ENHANCEMENT]
 * [BUGFIX]
 
+# 0.4.1 / 2020-02-02
+
 * [ENHANCEMENT] Smooth out pingers over the interval #48
 * [BUGFIX] Fix memory leak #49
 
