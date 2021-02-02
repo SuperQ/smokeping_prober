@@ -121,10 +121,15 @@ func main() {
 		pinger.Timeout = time.Duration(math.MaxInt64)
 		pinger.SetPrivileged(*privileged)
 
-		log.Infof("Starting prober for %s", host)
-		go pinger.Run()
-
 		pingers[i] = pinger
+	}
+
+	splay := time.Duration(interval.Nanoseconds() / int64(len(pingers)))
+	log.Infof("Waiting %s between starting pingers", splay)
+	for _, pinger := range pingers {
+		log.Infof("Starting prober for %s", pinger.Addr())
+		go pinger.Run()
+		time.Sleep(splay)
 	}
 
 	prometheus.MustRegister(NewSmokepingCollector(&pingers, *pingResponseSeconds))
