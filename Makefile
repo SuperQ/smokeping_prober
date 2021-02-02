@@ -16,13 +16,3 @@ DOCKER_REPO       ?= quay.io/superq
 DOCKER_IMAGE_NAME ?= smokeping-prober
 
 include Makefile.common
-
-.PHONY: build
-build: promu vendor
-	@echo ">> building binaries"
-	$(PROMU) build --prefix $(PREFIX)
-
-.PHONY: vendor
-vendor:
-	@echo ">> Running go mod venor"
-	$(GO) mod vendor
