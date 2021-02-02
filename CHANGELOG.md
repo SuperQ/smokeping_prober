@@ -5,11 +5,12 @@
 * [ENHANCEMENT]
 * [BUGFIX]
 
-* [ENHANCEMENT] Smooth out pingers over the interval
+* [ENHANCEMENT] Smooth out pingers over the interval #48
+* [BUGFIX] Fix memory leak #49
 
 ## 0.4.0 / 2021-01-31
 
-* [FEATURE] Add support for duplicate packet detection
+* [FEATURE] Add support for duplicate packet detection #47
 
 ## 0.3.1 / 2020-06-04
 
