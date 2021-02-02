@@ -119,6 +119,7 @@ func main() {
 
 		pinger.Interval = *interval
 		pinger.Timeout = time.Duration(math.MaxInt64)
+		pinger.RecordRtts = false
 		pinger.SetPrivileged(*privileged)
 
 		pingers[i] = pinger
