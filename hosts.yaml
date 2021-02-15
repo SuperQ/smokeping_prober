@@ -1,0 +1,16 @@
+targets:
+  - host:
+      ip:
+        - google.sk
+      network: ip4
+      protocol: icmp
+      labels:
+        name: google
+  - host:
+      ip:
+        - fb.com
+        - youtube.com
+      network: ip4
+      protocol: icmp
+      labels:
+        name: fb tr ff
