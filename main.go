@@ -19,23 +19,62 @@ import (
 	"math"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-ping/ping"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/log"
 	"github.com/prometheus/common/version"
 	"gopkg.in/alecthomas/kingpin.v2"
+	"gopkg.in/yaml.v2"
 )
 
 var (
 	// Generated with: prometheus.ExponentialBuckets(0.00005, 2, 20)
 	defaultBuckets = "5e-05,0.0001,0.0002,0.0004,0.0008,0.0016,0.0032,0.0064,0.0128,0.0256,0.0512,0.1024,0.2048,0.4096,0.8192,1.6384,3.2768,6.5536,13.1072,26.2144"
+	conf           *Conf
 )
+
+// Conf Default structure for parsign,saving, etc.
+// Default config and host variables from .yaml files
+type Conf struct {
+	Targets []struct {
+		Host struct {
+			IP       []string `yaml:"ip"`
+			Network  string   `yaml:"network"`
+			Protocol string   `yaml:"protocol"`
+			Labels   struct {
+				Name string `yaml:"name"`
+			} `yaml:"labels"`
+		} `yaml:"host"`
+	} `yaml:"targets"`
+}
+
+// NewConfig returns a new decoded Config struct
+func NewConfig(configPath string) (*Conf, error) {
+	// Create config structure
+	config := &Conf{}
+
+	// Open config file
+	file, err := os.Open(configPath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	// Init new YAML decode
+	d := yaml.NewDecoder(file)
+
+	// Start YAML decoding from file
+	if err := d.Decode(&config); err != nil {
+		return nil, err
+	}
+	return config, nil
+}
 
 type hostList []string
 
@@ -87,7 +126,8 @@ func main() {
 		buckets    = kingpin.Flag("buckets", "A comma delimited list of buckets to use").Default(defaultBuckets).String()
 		interval   = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("1s").Duration()
 		privileged = kingpin.Flag("privileged", "Run in privileged ICMP mode").Default("true").Bool()
-		hosts      = HostList(kingpin.Arg("hosts", "List of hosts to ping").Required())
+		config     = kingpin.Flag("config", "Path to config file").Default("hosts.yaml").String()
+		err        error
 	)
 
 	log.AddFlags(kingpin.CommandLine)
@@ -97,6 +137,12 @@ func main() {
 
 	log.Infoln("Starting smokeping_prober", version.Info())
 	log.Infoln("Build context", version.BuildContext())
+
+	conf, err = NewConfig(*config)
+	if err != nil {
+		fmt.Println(err)
+	}
+
 	bucketlist, err := parseBuckets(*buckets)
 	if err != nil {
 		log.Errorf("failed to parse buckets: %s\n", err.Error())
@@ -105,24 +151,32 @@ func main() {
 	pingResponseSeconds := newPingResponseHistogram(bucketlist)
 	prometheus.MustRegister(pingResponseSeconds)
 
-	pingers := make([]*ping.Pinger, len(*hosts))
-	for i, host := range *hosts {
-		pinger := ping.New(host)
+	var f = 0
+	for _, a := range conf.Targets {
+		f += len(a.Host.IP)
+	}
 
-		err := pinger.Resolve()
-		if err != nil {
-			log.Errorf("failed to resolve pinger: %s\n", err.Error())
-			return
+	pingers := make([]*ping.Pinger, f)
+
+	for l, a := range conf.Targets {
+		for i, host := range a.Host.IP {
+			pinger := ping.New(host)
+
+			err := pinger.Resolve()
+			if err != nil {
+				log.Errorf("failed to resolve pinger: %s\n", err.Error())
+				return
+			}
+
+			log.Infof("Resolved %s as %s", host, pinger.IPAddr())
+
+			pinger.Interval = *interval
+			pinger.Timeout = time.Duration(math.MaxInt64)
+			pinger.RecordRtts = false
+			pinger.SetPrivileged(*privileged)
+
+			pingers[l+i] = pinger
 		}
-
-		log.Infof("Resolved %s as %s", host, pinger.IPAddr())
-
-		pinger.Interval = *interval
-		pinger.Timeout = time.Duration(math.MaxInt64)
-		pinger.RecordRtts = false
-		pinger.SetPrivileged(*privileged)
-
-		pingers[i] = pinger
 	}
 
 	splay := time.Duration(interval.Nanoseconds() / int64(len(pingers)))
