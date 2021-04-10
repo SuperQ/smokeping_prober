@@ -64,8 +64,8 @@ github.com/go-kit/kit v0.10.0/go.mod h1:xUsJbQ/Fp4kEt7AFgCuvyX4a71u8h9jB8tj/ORgO
 github.com/go-logfmt/logfmt v0.3.0/go.mod h1:Qt1PoO58o5twSAckw1HlFXLmHsOX5/0LbT9GBnD5lWE=
 github.com/go-logfmt/logfmt v0.4.0/go.mod h1:3RMwSq7FuexP4Kalkev3ejPJsZTpXXBr9+V4qmtdjCk=
 github.com/go-logfmt/logfmt v0.5.0/go.mod h1:wCYkCAKZfumFQihp8CzCvQ3paCTfi41vtzG1KdI/P7A=
-github.com/go-ping/ping v0.0.0-20210410082138-ce482ab5424b h1:4Z9K57UMKTL3kTok5tKQst/aLCP6p1tthvVz/72DZpM=
-github.com/go-ping/ping v0.0.0-20210410082138-ce482ab5424b/go.mod h1:kvZscY06sPJUwnSmeinfIxBCyTczN8Ftj6cT3bn7VLc=
+github.com/go-ping/ping v0.0.0-20210417180633-a50937ef0888 h1:PaUBmncaVZpOwZM6KVcDPjAOfXdoR9v9r3RS6F5fVbM=
+github.com/go-ping/ping v0.0.0-20210417180633-a50937ef0888/go.mod h1:kvZscY06sPJUwnSmeinfIxBCyTczN8Ftj6cT3bn7VLc=
 github.com/go-sql-driver/mysql v1.4.0/go.mod h1:zAC/RDZ24gD3HViQzih4MyKcchzm+sOG5ZlKdlhCg5w=
 github.com/go-stack/stack v1.8.0/go.mod h1:v0f6uXyyMGvRgIKkXu+yp6POWl0qKG85gN/melR3HDY=
 github.com/gogo/googleapis v1.1.0/go.mod h1:gf4bu3Q80BeJ6H1S1vYPm8/ELATdvryBaNFGgqEef3s=
