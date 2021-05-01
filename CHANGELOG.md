@@ -5,7 +5,11 @@
 * [ENHANCEMENT]
 * [BUGFIX]
 
-# 0.4.1 / 2020-02-02
+# 0.4.2 / 2021-04-10
+
+* [BUGFIX] Fix sequence number wrapping #53
+
+# 0.4.1 / 2021-02-02
 
 * [ENHANCEMENT] Smooth out pingers over the interval #48
 * [BUGFIX] Fix memory leak #49
