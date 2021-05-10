@@ -15,26 +15,34 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-ping/ping"
+	"github.com/superq/smokeping_prober/config"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/log"
 	"github.com/prometheus/common/version"
+	"golang.org/x/sync/errgroup"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 var (
 	// Generated with: prometheus.ExponentialBuckets(0.00005, 2, 20)
 	defaultBuckets = "5e-05,0.0001,0.0002,0.0004,0.0008,0.0016,0.0032,0.0064,0.0128,0.0256,0.0512,0.1024,0.2048,0.4096,0.8192,1.6384,3.2768,6.5536,13.1072,26.2144"
+
+	sc = &config.SafeConfig{
+		C: &config.Config{},
+	}
 )
 
 type hostList []string
@@ -81,13 +89,14 @@ func parseBuckets(buckets string) ([]float64, error) {
 
 func main() {
 	var (
+		configFile    = kingpin.Flag("config.file", "Optional smokeping_prober configuration file.").Default("smokeping_prober.yml").String()
 		listenAddress = kingpin.Flag("web.listen-address", "Address on which to expose metrics and web interface.").Default(":9374").String()
 		metricsPath   = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
 
 		buckets    = kingpin.Flag("buckets", "A comma delimited list of buckets to use").Default(defaultBuckets).String()
 		interval   = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("1s").Duration()
 		privileged = kingpin.Flag("privileged", "Run in privileged ICMP mode").Default("true").Bool()
-		hosts      = HostList(kingpin.Arg("hosts", "List of hosts to ping").Required())
+		hosts      = HostList(kingpin.Arg("hosts", "List of hosts to ping"))
 	)
 
 	log.AddFlags(kingpin.CommandLine)
@@ -97,6 +106,16 @@ func main() {
 
 	log.Infoln("Starting smokeping_prober", version.Info())
 	log.Infoln("Build context", version.BuildContext())
+
+	if err := sc.ReloadConfig(*configFile); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			log.Infof("ignoring missing config file: %s", *configFile)
+		} else {
+			log.Errorf("error loading config: %s", err.Error())
+			return
+		}
+	}
+
 	bucketlist, err := parseBuckets(*buckets)
 	if err != nil {
 		log.Errorf("failed to parse buckets: %s\n", err.Error())
@@ -106,8 +125,10 @@ func main() {
 	prometheus.MustRegister(pingResponseSeconds)
 
 	pingers := make([]*ping.Pinger, len(*hosts))
+	var pinger *ping.Pinger
+	var host string
 	for i, host := range *hosts {
-		pinger := ping.New(host)
+		pinger = ping.New(host)
 
 		err := pinger.Resolve()
 		if err != nil {
@@ -125,11 +146,36 @@ func main() {
 		pingers[i] = pinger
 	}
 
+	sc.Lock()
+	for _, targetGroup := range sc.C.Targets {
+		for _, host = range targetGroup.Hosts {
+			pinger = ping.New(host)
+			pinger.Interval = targetGroup.Interval
+			pinger.SetNetwork(targetGroup.Network)
+			if targetGroup.Protocol == "icmp" {
+				pinger.SetPrivileged(true)
+			}
+			err := pinger.Resolve()
+			if err != nil {
+				log.Errorf("failed to resolve pinger: %s\n", err.Error())
+				return
+			}
+			pingers = append(pingers, pinger)
+		}
+	}
+	sc.Unlock()
+
+	if len(pingers) == 0 {
+		log.Errorf("no targets specified on command line or in config file")
+		return
+	}
+
 	splay := time.Duration(interval.Nanoseconds() / int64(len(pingers)))
 	log.Infof("Waiting %s between starting pingers", splay)
+	g := new(errgroup.Group)
 	for _, pinger := range pingers {
 		log.Infof("Starting prober for %s", pinger.Addr())
-		go pinger.Run()
+		g.Go(pinger.Run)
 		time.Sleep(splay)
 	}
 
@@ -149,5 +195,9 @@ func main() {
 	log.Fatal(http.ListenAndServe(*listenAddress, nil))
 	for _, pinger := range pingers {
 		pinger.Stop()
+	}
+	if err = g.Wait(); err != nil {
+		log.Fatalf("pingers failed: %s", err)
+		return
 	}
 }

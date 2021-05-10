@@ -18,7 +18,7 @@ jobs:
     - checkout
     - run: go mod download
     - run: make promu
-    - run: make style unused test build
+    - run: make style lint unused test build
     - run: rm -v smokeping_prober
 
 workflows:

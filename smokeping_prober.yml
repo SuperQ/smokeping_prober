@@ -1,0 +1,5 @@
+---
+targets:
+- hosts:
+  - localhost
+  interval: '0.5s'
