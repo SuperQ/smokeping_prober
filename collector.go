@@ -17,9 +17,9 @@ package main
 import (
 	"github.com/go-ping/ping"
 
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/prometheus/common/log"
 )
 
 const (
@@ -78,20 +78,19 @@ func NewSmokepingCollector(pingers *[]*ping.Pinger, pingResponseSeconds promethe
 		pinger.OnRecv = func(pkt *ping.Packet) {
 			pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Observe(pkt.Rtt.Seconds())
 			pingResponseTtl.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Set(float64(pkt.Ttl))
-			log.Debugf("%d bytes from %s: icmp_seq=%d time=%v ttl=%v\n",
-				pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt, pkt.Ttl)
+			level.Debug(logger).Log("msg", "Echo reply", "ip_addr", pkt.IPAddr,
+				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.Ttl)
 		}
 		pinger.OnDuplicateRecv = func(pkt *ping.Packet) {
 			pingResponseDuplicates.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Inc()
-			log.Debugf("%d bytes from %s: icmp_seq=%d time=%v ttl=%v (DUP!)\n",
-				pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt, pkt.Ttl)
+			level.Debug(logger).Log("msg", "Echo reply (DUP!)", "ip_addr", pkt.IPAddr,
+				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.Ttl)
 		}
 		pinger.OnFinish = func(stats *ping.Statistics) {
-			log.Debugf("\n--- %s ping statistics ---\n", stats.Addr)
-			log.Debugf("%d packets transmitted, %d packets received, %v%% packet loss\n",
-				stats.PacketsSent, stats.PacketsRecv, stats.PacketLoss)
-			log.Debugf("round-trip min/avg/max/stddev = %v/%v/%v/%v\n",
-				stats.MinRtt, stats.AvgRtt, stats.MaxRtt, stats.StdDevRtt)
+			level.Debug(logger).Log("msg", "Ping statistics", "addr", stats.Addr,
+				"packets_sent", stats.PacketsSent, "packets_received", stats.PacketsRecv,
+				"packet_loss_percent", stats.PacketLoss, "min_rtt", stats.MinRtt, "avg_rtt",
+				stats.AvgRtt, "max_rtt", stats.MaxRtt, "stddev_rtt", stats.StdDevRtt)
 		}
 	}
 

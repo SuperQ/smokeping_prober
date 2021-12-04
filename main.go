@@ -19,15 +19,19 @@ import (
 	"math"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-ping/ping"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/log"
+	"github.com/prometheus/common/promlog"
+	"github.com/prometheus/common/promlog/flag"
 	"github.com/prometheus/common/version"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
@@ -35,6 +39,8 @@ import (
 var (
 	// Generated with: prometheus.ExponentialBuckets(0.00005, 2, 20)
 	defaultBuckets = "5e-05,0.0001,0.0002,0.0004,0.0008,0.0016,0.0032,0.0064,0.0128,0.0256,0.0512,0.1024,0.2048,0.4096,0.8192,1.6384,3.2768,6.5536,13.1072,26.2144"
+
+	logger log.Logger
 )
 
 type hostList []string
@@ -90,16 +96,18 @@ func main() {
 		hosts      = HostList(kingpin.Arg("hosts", "List of hosts to ping").Required())
 	)
 
-	log.AddFlags(kingpin.CommandLine)
+	promlogConfig := &promlog.Config{}
+	flag.AddFlags(kingpin.CommandLine, promlogConfig)
 	kingpin.Version(version.Print("smokeping_prober"))
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
+	logger = promlog.New(promlogConfig)
 
-	log.Infoln("Starting smokeping_prober", version.Info())
-	log.Infoln("Build context", version.BuildContext())
+	level.Info(logger).Log("msg", "Starting smokeping_prober", "version", version.Info())
+	level.Info(logger).Log("msg", "Build context", "build_context", version.BuildContext())
 	bucketlist, err := parseBuckets(*buckets)
 	if err != nil {
-		log.Errorf("failed to parse buckets: %s\n", err.Error())
+		level.Error(logger).Log("msg", "Failed to parse buckets", "err", err)
 		return
 	}
 	pingResponseSeconds := newPingResponseHistogram(bucketlist)
@@ -111,11 +119,11 @@ func main() {
 
 		err := pinger.Resolve()
 		if err != nil {
-			log.Errorf("failed to resolve pinger: %s\n", err.Error())
+			level.Error(logger).Log("msg", "Failed to resolve pinger", "err", err)
 			return
 		}
 
-		log.Infof("Resolved %s as %s", host, pinger.IPAddr())
+		level.Info(logger).Log("msg", "Pinger resolved", "host", host, "ip_addr", pinger.IPAddr())
 
 		pinger.Interval = *interval
 		pinger.Timeout = time.Duration(math.MaxInt64)
@@ -126,9 +134,9 @@ func main() {
 	}
 
 	splay := time.Duration(interval.Nanoseconds() / int64(len(pingers)))
-	log.Infof("Waiting %s between starting pingers", splay)
+	level.Info(logger).Log("msg", fmt.Sprintf("Waiting %s between starting pingers", splay))
 	for _, pinger := range pingers {
-		log.Infof("Starting prober for %s", pinger.Addr())
+		level.Info(logger).Log("msg", "Starting prober", "addr", pinger.Addr())
 		go pinger.Run()
 		time.Sleep(splay)
 	}
@@ -145,8 +153,13 @@ func main() {
 			</body>
 			</html>`))
 	})
-	log.Infof("Listening on %s", *listenAddress)
-	log.Fatal(http.ListenAndServe(*listenAddress, nil))
+
+	level.Info(logger).Log("msg", "Listening on", "address", *listenAddress)
+	if err := http.ListenAndServe(*listenAddress, nil); err != nil {
+		level.Error(logger).Log("err", err)
+		os.Exit(1)
+	}
+
 	for _, pinger := range pingers {
 		pinger.Stop()
 	}
