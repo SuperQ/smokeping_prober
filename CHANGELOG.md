@@ -5,6 +5,10 @@
 * [ENHANCEMENT]
 * [BUGFIX]
 
+# 0.5.0 / 2021-12-19
+
+* [FEATURE] Support loading targets from a config file #54
+
 # 0.4.2 / 2021-04-10
 
 * [BUGFIX] Fix sequence number wrapping #53
