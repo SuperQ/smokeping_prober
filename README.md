@@ -1,4 +1,8 @@
 # smokeping_prober
+
+[![CircleCI](https://circleci.com/gh/SuperQ/smokeping_prober/tree/master.svg?style=svg)](https://circleci.com/gh/SuperQ/smokeping_prober/tree/master)
+[![Docker Repository on Quay](https://quay.io/repository/superq/smokeping-prober/status "Docker Repository on Quay")](https://quay.io/repository/superq/smokeping-prober)
+
 Prometheus style "smokeping" prober.
 
 ![Example Graph](example-graph.png)
@@ -61,8 +65,18 @@ NOTE: The config is only read on startup, SIGHUP is not supported (yet).
 Requires Go >= 1.14
 
 ```console
-go get github.com/superq/smokeping_prober
+go install github.com/superq/smokeping_prober@latest
 sudo setcap cap_net_raw=+ep ${GOPATH}/bin/smokeping_prober
+```
+
+## Docker
+
+```bash
+docker run \
+  -p 9374:9374 \
+  --privileged \
+  quay.io/superq/smokeping-prober:latest \
+  some-ping-target.example.com
 ```
 
 ## Metrics
