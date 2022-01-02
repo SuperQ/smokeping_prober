@@ -46,6 +46,7 @@ var (
 		Interval: time.Second,
 		Network:  "ip",
 		Protocol: "icmp",
+		Size:     56,
 	}
 )
 
@@ -92,6 +93,7 @@ type TargetGroup struct {
 	Interval time.Duration `yaml:"interval,omitempty"`
 	Network  string        `yaml:"network,omitempty"`
 	Protocol string        `yaml:"protocol,omitempty"`
+	Size     int           `yaml:"size,omitempty"`
 	// TODO: Needs work to fix MetricFamily consistency.
 	// Labels   map[string]string `yaml:"labels,omitempty"`
 }
