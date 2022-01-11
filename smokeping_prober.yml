@@ -3,3 +3,4 @@ targets:
 - hosts:
   - localhost
   interval: '0.5s'
+  size: 56

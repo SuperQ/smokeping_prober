@@ -101,6 +101,7 @@ func main() {
 		buckets    = kingpin.Flag("buckets", "A comma delimited list of buckets to use").Default(defaultBuckets).String()
 		interval   = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("1s").Duration()
 		privileged = kingpin.Flag("privileged", "Run in privileged ICMP mode").Default("true").Bool()
+		sizeBytes  = kingpin.Flag("ping.size", "Ping packet size in bytes").Short('s').Default("56").Int()
 		hosts      = HostList(kingpin.Arg("hosts", "List of hosts to ping"))
 	)
 
@@ -113,6 +114,11 @@ func main() {
 
 	level.Info(logger).Log("msg", "Starting smokeping_prober", "version", version.Info())
 	level.Info(logger).Log("msg", "Build context", "build_context", version.BuildContext())
+
+	if *sizeBytes < 24 || *sizeBytes > 65535 {
+		level.Error(logger).Log("msg", "Invalid packet size. (24-65535)", "bytes", *sizeBytes)
+		os.Exit(1)
+	}
 
 	if err := sc.ReloadConfig(*configFile); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -149,6 +155,7 @@ func main() {
 		pinger.Timeout = time.Duration(math.MaxInt64)
 		pinger.RecordRtts = false
 		pinger.SetPrivileged(*privileged)
+		pinger.Size = *sizeBytes
 
 		pingers[i] = pinger
 	}
@@ -160,10 +167,16 @@ func main() {
 		if targetGroup.Interval > maxInterval {
 			maxInterval = targetGroup.Interval
 		}
+		packetSize := targetGroup.Size
+		if packetSize < 24 || packetSize > 65535 {
+			level.Error(logger).Log("msg", "Invalid packet size. (24-65535)", "bytes", packetSize)
+			return
+		}
 		for _, host = range targetGroup.Hosts {
 			pinger = ping.New(host)
 			pinger.Interval = targetGroup.Interval
 			pinger.SetNetwork(targetGroup.Network)
+			pinger.Size = packetSize
 			if targetGroup.Protocol == "icmp" {
 				pinger.SetPrivileged(true)
 			}
@@ -186,7 +199,7 @@ func main() {
 	level.Info(logger).Log("msg", fmt.Sprintf("Waiting %s between starting pingers", splay))
 	g := new(errgroup.Group)
 	for _, pinger := range pingers {
-		level.Info(logger).Log("msg", "Starting prober", "address", pinger.Addr(), "interval", pinger.Interval)
+		level.Info(logger).Log("msg", "Starting prober", "address", pinger.Addr(), "interval", pinger.Interval, "size_bytes", pinger.Size)
 		g.Go(pinger.Run)
 		time.Sleep(splay)
 	}
