@@ -5,6 +5,8 @@
 * [ENHANCEMENT]
 * [BUGFIX]
 
+* [BUGFIX] Fix histogram buckets #65
+
 # 0.5.0 / 2021-12-19
 
 * [FEATURE] Support loading targets from a config file #54
