@@ -53,7 +53,7 @@ func newPingResponseHistogram(buckets []float64) *prometheus.HistogramVec {
 			Namespace: namespace,
 			Name:      "response_duration_seconds",
 			Help:      "A histogram of latencies for ping responses.",
-			Buckets:   prometheus.ExponentialBuckets(0.00025, 2, 16),
+			Buckets:   buckets,
 		},
 		labelNames,
 	)
