@@ -5,6 +5,8 @@
 * [ENHANCEMENT]
 * [BUGFIX]
 
+# 0.5.0 / 2021-12-19
+
 * [BUGFIX] Fix histogram buckets #65
 
 # 0.5.0 / 2021-12-19
