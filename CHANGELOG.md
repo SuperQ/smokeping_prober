@@ -5,7 +5,11 @@
 * [ENHANCEMENT]
 * [BUGFIX]
 
-## 0.5.1 / 2021-12-19
+## 0.5.2 / 2022-03-17
+
+Re-tag release.
+
+## 0.5.1 / 2022-03-16
 
 * [BUGFIX] Fix histogram buckets #65
 
