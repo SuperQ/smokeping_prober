@@ -125,14 +125,14 @@ func main() {
 			level.Info(logger).Log("msg", "ignoring missing config file", "filename", *configFile)
 		} else {
 			level.Error(logger).Log("msg", "error loading config", "filename", err.Error())
-			return
+			os.Exit(1)
 		}
 	}
 
 	bucketlist, err := parseBuckets(*buckets)
 	if err != nil {
 		level.Error(logger).Log("msg", "Failed to parse buckets", "err", err)
-		return
+		os.Exit(1)
 	}
 	pingResponseSeconds := newPingResponseHistogram(bucketlist)
 	prometheus.MustRegister(pingResponseSeconds)
@@ -146,7 +146,7 @@ func main() {
 		err := pinger.Resolve()
 		if err != nil {
 			level.Error(logger).Log("msg", "Failed to resolve pinger", "err", err)
-			return
+			os.Exit(1)
 		}
 
 		level.Info(logger).Log("msg", "Pinger resolved", "host", host, "ip_addr", pinger.IPAddr())
@@ -170,7 +170,7 @@ func main() {
 		packetSize := targetGroup.Size
 		if packetSize < 24 || packetSize > 65535 {
 			level.Error(logger).Log("msg", "Invalid packet size. (24-65535)", "bytes", packetSize)
-			return
+			os.Exit(1)
 		}
 		for _, host = range targetGroup.Hosts {
 			pinger = ping.New(host)
@@ -183,7 +183,7 @@ func main() {
 			err := pinger.Resolve()
 			if err != nil {
 				level.Error(logger).Log("msg", "failed to resolve pinger", "error", err.Error())
-				return
+				os.Exit(1)
 			}
 			pingers = append(pingers, pinger)
 		}
@@ -192,7 +192,7 @@ func main() {
 
 	if len(pingers) == 0 {
 		level.Error(logger).Log("msg", "no targets specified on command line or in config file")
-		return
+		os.Exit(1)
 	}
 
 	splay := time.Duration(interval.Nanoseconds() / int64(len(pingers)))
