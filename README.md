@@ -21,6 +21,8 @@ Flags:
                                  Address on which to expose metrics and web interface.
       --web.telemetry-path="/metrics"
                                  Path under which to expose metrics.
+      --web.config=TLS.CONFIG.FILE
+                                Path to config yaml file that can enable TLS
       --buckets="5e-05,0.0001,0.0002,0.0004,0.0008,0.0016,0.0032,0.0064,0.0128,0.0256,0.0512,0.1024,0.2048,0.4096,0.8192,1.6384,3.2768,6.5536,13.1072,26.2144"
                                  A comma delimited list of buckets to use
   -i, --ping.interval=1s         Ping interval duration
