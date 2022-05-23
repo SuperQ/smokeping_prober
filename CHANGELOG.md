@@ -5,6 +5,11 @@
 * [ENHANCEMENT]
 * [BUGFIX]
 
+## 0.6.0 / 2022-05-23
+
+* [CHANGE] Exit with a non-zero error code on fatal error #70
+* [FEATURE] Add TLS/Auth from exporter-toolkit #69
+
 ## 0.5.2 / 2022-03-17
 
 Re-tag release.

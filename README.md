@@ -63,7 +63,7 @@ NOTE: The config is only read on startup, SIGHUP is not supported (yet).
 
 ## Building and running
 
-Requires Go >= 1.14
+Requires Go >= 1.17
 
 ```console
 go install github.com/superq/smokeping_prober@latest
