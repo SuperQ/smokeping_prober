@@ -17,7 +17,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 	_ "net/http/pprof"
 	"os"

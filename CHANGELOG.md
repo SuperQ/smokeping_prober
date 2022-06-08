@@ -5,6 +5,10 @@
 * [ENHANCEMENT]
 * [BUGFIX]
 
+## 0.6.1 / 2022-06-08
+
+* [BUGFIX] Fix RecordRtts memory leak for config file targets #73
+
 ## 0.6.0 / 2022-05-23
 
 * [CHANGE] Exit with a non-zero error code on fatal error #70
