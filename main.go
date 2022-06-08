@@ -154,7 +154,6 @@ func main() {
 		level.Info(logger).Log("msg", "Pinger resolved", "host", host, "ip_addr", pinger.IPAddr())
 
 		pinger.Interval = *interval
-		pinger.Timeout = time.Duration(math.MaxInt64)
 		pinger.RecordRtts = false
 		pinger.SetPrivileged(*privileged)
 		pinger.Size = *sizeBytes
@@ -176,6 +175,7 @@ func main() {
 		for _, host = range targetGroup.Hosts {
 			pinger = ping.New(host)
 			pinger.Interval = targetGroup.Interval
+			pinger.RecordRtts = false
 			pinger.SetNetwork(targetGroup.Network)
 			pinger.Size = packetSize
 			if targetGroup.Protocol == "icmp" {
