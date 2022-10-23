@@ -15,7 +15,7 @@
 package main
 
 import (
-	"github.com/go-ping/ping"
+	"github.com/prometheus-community/pro-bing"
 
 	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
@@ -29,7 +29,7 @@ const (
 var (
 	labelNames = []string{"ip", "host"}
 
-	pingResponseTtl = promauto.NewGaugeVec(
+	pingResponseTTL = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "response_ttl",
@@ -61,32 +61,32 @@ func newPingResponseHistogram(buckets []float64) *prometheus.HistogramVec {
 
 // SmokepingCollector collects metrics from the pinger.
 type SmokepingCollector struct {
-	pingers *[]*ping.Pinger
+	pingers *[]*probing.Pinger
 
 	requestsSent *prometheus.Desc
 }
 
-func NewSmokepingCollector(pingers *[]*ping.Pinger, pingResponseSeconds prometheus.HistogramVec) *SmokepingCollector {
+func NewSmokepingCollector(pingers *[]*probing.Pinger, pingResponseSeconds prometheus.HistogramVec) *SmokepingCollector {
 	for _, pinger := range *pingers {
 		// Init all metrics to 0s.
 		ipAddr := pinger.IPAddr().String()
 		pingResponseDuplicates.WithLabelValues(ipAddr, pinger.Addr())
 		pingResponseSeconds.WithLabelValues(ipAddr, pinger.Addr())
-		pingResponseTtl.WithLabelValues(ipAddr, pinger.Addr())
+		pingResponseTTL.WithLabelValues(ipAddr, pinger.Addr())
 
 		// Setup handler functions.
-		pinger.OnRecv = func(pkt *ping.Packet) {
+		pinger.OnRecv = func(pkt *probing.Packet) {
 			pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Observe(pkt.Rtt.Seconds())
-			pingResponseTtl.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Set(float64(pkt.Ttl))
+			pingResponseTTL.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Set(float64(pkt.TTL))
 			level.Debug(logger).Log("msg", "Echo reply", "ip_addr", pkt.IPAddr,
-				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.Ttl)
+				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL)
 		}
-		pinger.OnDuplicateRecv = func(pkt *ping.Packet) {
+		pinger.OnDuplicateRecv = func(pkt *probing.Packet) {
 			pingResponseDuplicates.WithLabelValues(pkt.IPAddr.String(), pkt.Addr).Inc()
 			level.Debug(logger).Log("msg", "Echo reply (DUP!)", "ip_addr", pkt.IPAddr,
-				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.Ttl)
+				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL)
 		}
-		pinger.OnFinish = func(stats *ping.Statistics) {
+		pinger.OnFinish = func(stats *probing.Statistics) {
 			level.Debug(logger).Log("msg", "Ping statistics", "addr", stats.Addr,
 				"packets_sent", stats.PacketsSent, "packets_received", stats.PacketsRecv,
 				"packet_loss_percent", stats.PacketLoss, "min_rtt", stats.MinRtt, "avg_rtt",
