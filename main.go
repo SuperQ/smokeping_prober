@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-ping/ping"
+	"github.com/prometheus-community/pro-bing"
 	"github.com/superq/smokeping_prober/config"
 
 	"github.com/go-kit/log"
@@ -138,11 +138,11 @@ func main() {
 	pingResponseSeconds := newPingResponseHistogram(bucketlist)
 	prometheus.MustRegister(pingResponseSeconds)
 
-	pingers := make([]*ping.Pinger, len(*hosts))
-	var pinger *ping.Pinger
+	pingers := make([]*probing.Pinger, len(*hosts))
+	var pinger *probing.Pinger
 	var host string
 	for i, host := range *hosts {
-		pinger = ping.New(host)
+		pinger = probing.New(host)
 
 		err := pinger.Resolve()
 		if err != nil {
@@ -172,7 +172,7 @@ func main() {
 			os.Exit(1)
 		}
 		for _, host = range targetGroup.Hosts {
-			pinger = ping.New(host)
+			pinger = probing.New(host)
 			pinger.Interval = targetGroup.Interval
 			pinger.RecordRtts = false
 			pinger.SetNetwork(targetGroup.Network)
