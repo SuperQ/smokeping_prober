@@ -177,6 +177,7 @@ func main() {
 			pinger.RecordRtts = false
 			pinger.SetNetwork(targetGroup.Network)
 			pinger.Size = packetSize
+			pinger.Source = targetGroup.Source
 			if targetGroup.Protocol == "icmp" {
 				pinger.SetPrivileged(true)
 			}
@@ -199,7 +200,7 @@ func main() {
 	level.Info(logger).Log("msg", fmt.Sprintf("Waiting %s between starting pingers", splay))
 	g := new(errgroup.Group)
 	for _, pinger := range pingers {
-		level.Info(logger).Log("msg", "Starting prober", "address", pinger.Addr(), "interval", pinger.Interval, "size_bytes", pinger.Size)
+		level.Info(logger).Log("msg", "Starting prober", "address", pinger.Addr(), "interval", pinger.Interval, "size_bytes", pinger.Size, "source", pinger.Source)
 		g.Go(pinger.Run)
 		time.Sleep(splay)
 	}
