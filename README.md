@@ -17,12 +17,13 @@ usage: smokeping_prober [<flags>] [<hosts>...]
 Flags:
   -h, --help                     Show context-sensitive help (also try --help-long and --help-man).
       --config.file=CONFIG.FILE  Optional smokeping_prober configuration yaml file.
-      --web.listen-address=":9374"
-                                 Address on which to expose metrics and web interface.
       --web.telemetry-path="/metrics"
                                  Path under which to expose metrics.
-      --web.config=TLS.CONFIG.FILE
-                                Path to config yaml file that can enable TLS
+      --web.systemd-socket       Use systemd socket activation listeners instead of port listeners (Linux only).
+      --web.listen-address=:9374 ...
+                                 Addresses on which to expose metrics and web interface. Repeatable for multiple
+                                 addresses.
+      --web.config.file=""       [EXPERIMENTAL] Path to configuration file that can enable TLS or authentication.
       --buckets="5e-05,0.0001,0.0002,0.0004,0.0008,0.0016,0.0032,0.0064,0.0128,0.0256,0.0512,0.1024,0.2048,0.4096,0.8192,1.6384,3.2768,6.5536,13.1072,26.2144"
                                  A comma delimited list of buckets to use
   -i, --ping.interval=1s         Ping interval duration
@@ -86,3 +87,11 @@ docker run \
 ----------------------------------------|------------|-------------------------------------------
  smokeping\_requests\_total             | Counter    | Counter of pings sent.
  smokeping\_response\_duration\_seconds | Histogram  | Ping response duration.
+
+### TLS and basic authentication
+
+The Smokeping Prober supports TLS and basic authentication.
+
+To use TLS and/or basic authentication, you need to pass a configuration file
+using the `--web.config.file` parameter. The format of the file is described
+[in the exporter-toolkit repository](https://github.com/prometheus/exporter-toolkit/blob/master/docs/web-configuration.md).
