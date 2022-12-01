@@ -35,6 +35,7 @@ import (
 	"github.com/prometheus/common/promlog/flag"
 	"github.com/prometheus/common/version"
 	"github.com/prometheus/exporter-toolkit/web"
+	"github.com/prometheus/exporter-toolkit/web/kingpinflag"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
@@ -94,10 +95,9 @@ func parseBuckets(buckets string) ([]float64, error) {
 
 func main() {
 	var (
-		configFile    = kingpin.Flag("config.file", "Optional smokeping_prober configuration yaml file.").String()
-		listenAddress = kingpin.Flag("web.listen-address", "Address on which to expose metrics and web interface.").Default(":9374").String()
-		metricsPath   = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
-		tlsConfigFile = kingpin.Flag("web.config", "Path to config yaml file that can enable TLS").Default("").String()
+		configFile  = kingpin.Flag("config.file", "Optional smokeping_prober configuration yaml file.").String()
+		metricsPath = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
+		webConfig   = kingpinflag.AddFlags(kingpin.CommandLine, ":9374")
 
 		buckets    = kingpin.Flag("buckets", "A comma delimited list of buckets to use").Default(defaultBuckets).String()
 		interval   = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("1s").Duration()
@@ -217,10 +217,8 @@ func main() {
 			</html>`))
 	})
 
-	level.Info(logger).Log("msg", "Listening on", "address", *listenAddress)
-	server := &http.Server{Addr: *listenAddress}
-
-	if err := web.ListenAndServe(server, *tlsConfigFile, logger); err != nil {
+	server := &http.Server{}
+	if err := web.ListenAndServe(server, webConfig, logger); err != nil {
 		level.Error(logger).Log("err", err)
 		os.Exit(1)
 	}
