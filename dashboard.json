@@ -494,14 +494,14 @@
           "type": "prometheus",
           "uid": "${DS_PROMETHEUS}"
         },
-        "definition": "label_values(smokeping_response_duration_seconds_bucket, host)",
+        "definition": "label_values(smokeping_requests_total, host)",
         "hide": 0,
         "includeAll": true,
         "multi": false,
         "name": "target",
         "options": [],
         "query": {
-          "query": "label_values(smokeping_response_duration_seconds_bucket, host)",
+          "query": "label_values(smokeping_requests_total, host)",
           "refId": "Prometheus-target-Variable-Query"
         },
         "refresh": 1,
@@ -516,7 +516,7 @@
     ]
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {
@@ -545,8 +545,8 @@
     ]
   },
   "timezone": "",
-  "title": "Smoke Ping",
+  "title": "Smokeping",
   "uid": "i5aRaLaik",
-  "version": 3,
+  "version": 12,
   "weekStart": ""
 }
