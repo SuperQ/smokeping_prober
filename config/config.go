@@ -88,8 +88,13 @@ func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
 	return nil
 }
 
+type Host struct {
+	Host        string `yaml:"host"`
+	Description string `yaml:"description,omitempty"`
+}
+
 type TargetGroup struct {
-	Hosts    []string      `yaml:"hosts"`
+	Hosts    []*Host       `yaml:"hosts"`
 	Interval time.Duration `yaml:"interval,omitempty"`
 	Network  string        `yaml:"network,omitempty"`
 	Protocol string        `yaml:"protocol,omitempty"`
