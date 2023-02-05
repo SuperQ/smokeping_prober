@@ -93,6 +93,15 @@ func parseBuckets(buckets string) ([]float64, error) {
 	return bucketlist, nil
 }
 
+type ExtPinger struct {
+	*probing.Pinger
+	Description string
+}
+
+func NewExtPinger(addr string, description string) *ExtPinger {
+	return &ExtPinger{Pinger: probing.New(addr), Description: description}
+}
+
 func main() {
 	var (
 		configFile  = kingpin.Flag("config.file", "Optional smokeping_prober configuration yaml file.").String()
@@ -138,11 +147,10 @@ func main() {
 	pingResponseSeconds := newPingResponseHistogram(bucketlist)
 	prometheus.MustRegister(pingResponseSeconds)
 
-	pingers := make([]*probing.Pinger, len(*hosts))
-	var pinger *probing.Pinger
-	var host string
+	pingers := make([]*ExtPinger, len(*hosts))
+	//var host Ho
 	for i, host := range *hosts {
-		pinger = probing.New(host)
+		pinger := NewExtPinger(host, host)
 
 		err := pinger.Resolve()
 		if err != nil {
@@ -171,8 +179,8 @@ func main() {
 			level.Error(logger).Log("msg", "Invalid packet size. (24-65535)", "bytes", packetSize)
 			os.Exit(1)
 		}
-		for _, host = range targetGroup.Hosts {
-			pinger = probing.New(host)
+		for _, host := range targetGroup.Hosts {
+			pinger := NewExtPinger(host.Host, host.Description)
 			pinger.Interval = targetGroup.Interval
 			pinger.RecordRtts = false
 			pinger.SetNetwork(targetGroup.Network)
