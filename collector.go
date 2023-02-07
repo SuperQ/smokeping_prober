@@ -70,27 +70,28 @@ func NewSmokepingCollector(pingers *[]*ExtPinger, pingResponseSeconds prometheus
 	for _, pinger := range *pingers {
 		// Init all metrics to 0s.
 		ipAddr := pinger.IPAddr().String()
-		pingResponseDuplicates.WithLabelValues(ipAddr, pinger.Addr(), pinger.Source, pinger.Description)
-		pingResponseSeconds.WithLabelValues(ipAddr, pinger.Addr(), pinger.Source, pinger.Description)
-		pingResponseTTL.WithLabelValues(ipAddr, pinger.Addr(), pinger.Source, pinger.Description)
+		description := pinger.Description
+		pingResponseDuplicates.WithLabelValues(ipAddr, pinger.Addr(), pinger.Source, description)
+		pingResponseSeconds.WithLabelValues(ipAddr, pinger.Addr(), pinger.Source, description)
+		pingResponseTTL.WithLabelValues(ipAddr, pinger.Addr(), pinger.Source, description)
 
 		// Setup handler functions.
 		pinger.OnRecv = func(pkt *probing.Packet) {
-			pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), pkt.Addr, pinger.Source, pinger.Description).Observe(pkt.Rtt.Seconds())
-			pingResponseTTL.WithLabelValues(pkt.IPAddr.String(), pkt.Addr, pinger.Source, pinger.Description).Set(float64(pkt.TTL))
+			pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), pkt.Addr, pinger.Source, description).Observe(pkt.Rtt.Seconds())
+			pingResponseTTL.WithLabelValues(pkt.IPAddr.String(), pkt.Addr, pinger.Source, description).Set(float64(pkt.TTL))
 			level.Debug(logger).Log("msg", "Echo reply", "ip_addr", pkt.IPAddr,
-				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL)
+				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL, "description", description)
 		}
 		pinger.OnDuplicateRecv = func(pkt *probing.Packet) {
-			pingResponseDuplicates.WithLabelValues(pkt.IPAddr.String(), pkt.Addr, pinger.Source, pinger.Description).Inc()
+			pingResponseDuplicates.WithLabelValues(pkt.IPAddr.String(), pkt.Addr, pinger.Source, description).Inc()
 			level.Debug(logger).Log("msg", "Echo reply (DUP!)", "ip_addr", pkt.IPAddr,
-				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL)
+				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL, "description", description)
 		}
 		pinger.OnFinish = func(stats *probing.Statistics) {
 			level.Debug(logger).Log("msg", "Ping statistics", "addr", stats.Addr,
 				"packets_sent", stats.PacketsSent, "packets_received", stats.PacketsRecv,
 				"packet_loss_percent", stats.PacketLoss, "min_rtt", stats.MinRtt, "avg_rtt",
-				stats.AvgRtt, "max_rtt", stats.MaxRtt, "stddev_rtt", stats.StdDevRtt)
+				stats.AvgRtt, "max_rtt", stats.MaxRtt, "stddev_rtt", stats.StdDevRtt, "description", description)
 		}
 	}
 

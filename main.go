@@ -150,7 +150,7 @@ func main() {
 	pingers := make([]*ExtPinger, len(*hosts))
 	//var host Ho
 	for i, host := range *hosts {
-		pinger := NewExtPinger(host, host)
+		pinger := NewExtPinger(host, "")
 
 		err := pinger.Resolve()
 		if err != nil {

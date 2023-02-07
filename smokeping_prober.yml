@@ -1,7 +1,6 @@
 ---
 targets:
   - hosts:
-      - host: localhost
       - host: 8.8.8.8
         description: Google DNS # Optional field
       - host: 1.1.1.1
