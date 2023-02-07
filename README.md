@@ -50,7 +50,9 @@ targets:
   - hosts:
       - host: host1
         description: optional host1 description
-      - host2
+      - host: host2
+      - host: 8.8.8.8
+        description: Google DNS
     interval: 1s # Duration, Default 1s.
     network: ip # One of ip, ip4, ip6. Default: ip (automatic IPv4/IPv6)
     protocol: icmp # One of icmp, udp. Default: icmp (Requires privileged operation)
