@@ -56,10 +56,9 @@ type hostList []string
 func (h *hostList) Set(value string) error {
 	if value == "" {
 		return fmt.Errorf("'%s' is not valid hostname", value)
-	} else {
-		*h = append(*h, value)
-		return nil
 	}
+	*h = append(*h, value)
+	return nil
 }
 
 func (h *hostList) String() string {
