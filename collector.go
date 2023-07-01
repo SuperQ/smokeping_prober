@@ -45,6 +45,21 @@ var (
 		},
 		labelNames,
 	)
+	pingRecvErrors = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "receive_errors_total",
+			Help:      "The number of errors when Pinger attempts to receive packets.",
+		},
+	)
+	pingSendErrors = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "send_errors_total",
+			Help:      "The number of errors when Pinger attempts to send packets.",
+		},
+		labelNames,
+	)
 )
 
 func newPingResponseHistogram(buckets []float64, factor float64) *prometheus.HistogramVec {
@@ -74,6 +89,7 @@ func NewSmokepingCollector(pingers *[]*probing.Pinger, pingResponseSeconds prome
 		pingResponseDuplicates.WithLabelValues(ipAddr, pinger.Addr(), pinger.Source)
 		pingResponseSeconds.WithLabelValues(ipAddr, pinger.Addr(), pinger.Source)
 		pingResponseTTL.WithLabelValues(ipAddr, pinger.Addr(), pinger.Source)
+		pingSendErrors.WithLabelValues(ipAddr, pinger.Addr(), pinger.Source)
 
 		// Setup handler functions.
 		pinger.OnRecv = func(pkt *probing.Packet) {
@@ -92,6 +108,15 @@ func NewSmokepingCollector(pingers *[]*probing.Pinger, pingResponseSeconds prome
 				"packets_sent", stats.PacketsSent, "packets_received", stats.PacketsRecv,
 				"packet_loss_percent", stats.PacketLoss, "min_rtt", stats.MinRtt, "avg_rtt",
 				stats.AvgRtt, "max_rtt", stats.MaxRtt, "stddev_rtt", stats.StdDevRtt)
+		}
+		pinger.OnRecvError = func(err error) {
+			pingRecvErrors.Inc()
+			level.Debug(logger).Log("msg", "Error receiving packet", "error", err)
+		}
+		pinger.OnSendError = func(pkt *probing.Packet, err error) {
+			pingSendErrors.WithLabelValues(pkt.IPAddr.String(), pkt.Addr, pinger.Source).Inc()
+			level.Debug(logger).Log("msg", "Error sending packet", "ip_addr", pkt.IPAddr,
+				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL, "error", err)
 		}
 	}
 
