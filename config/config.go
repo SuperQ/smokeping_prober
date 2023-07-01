@@ -102,18 +102,12 @@ type TargetGroup struct {
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (s *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type plain Config
-	if err := unmarshal((*plain)(s)); err != nil {
-		return err
-	}
-	return nil
+	return unmarshal((*plain)(s))
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (s *TargetGroup) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	*s = DefaultTargetGroup
 	type plain TargetGroup
-	if err := unmarshal((*plain)(s)); err != nil {
-		return err
-	}
-	return nil
+	return unmarshal((*plain)(s))
 }
