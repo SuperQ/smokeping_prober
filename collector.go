@@ -47,13 +47,14 @@ var (
 	)
 )
 
-func newPingResponseHistogram(buckets []float64) *prometheus.HistogramVec {
+func newPingResponseHistogram(buckets []float64, factor float64) *prometheus.HistogramVec {
 	return prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: namespace,
-			Name:      "response_duration_seconds",
-			Help:      "A histogram of latencies for ping responses.",
-			Buckets:   buckets,
+			Namespace:                   namespace,
+			Name:                        "response_duration_seconds",
+			Help:                        "A histogram of latencies for ping responses.",
+			Buckets:                     buckets,
+			NativeHistogramBucketFactor: factor,
 		},
 		labelNames,
 	)

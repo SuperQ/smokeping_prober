@@ -100,6 +100,7 @@ func main() {
 		webConfig   = kingpinflag.AddFlags(kingpin.CommandLine, ":9374")
 
 		buckets    = kingpin.Flag("buckets", "A comma delimited list of buckets to use").Default(defaultBuckets).String()
+		factor     = kingpin.Flag("native-histogram-factor", "The scaling factor for native histogram buckets").Hidden().Default("1.05").Float()
 		interval   = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("1s").Duration()
 		privileged = kingpin.Flag("privileged", "Run in privileged ICMP mode").Default("true").Bool()
 		sizeBytes  = kingpin.Flag("ping.size", "Ping packet size in bytes").Short('s').Default("56").Int()
@@ -135,7 +136,7 @@ func main() {
 		level.Error(logger).Log("msg", "Failed to parse buckets", "err", err)
 		os.Exit(1)
 	}
-	pingResponseSeconds := newPingResponseHistogram(bucketlist)
+	pingResponseSeconds := newPingResponseHistogram(bucketlist, *factor)
 	prometheus.MustRegister(pingResponseSeconds)
 
 	pingers := make([]*probing.Pinger, len(*hosts))
