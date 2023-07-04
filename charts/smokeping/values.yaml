@@ -1,0 +1,113 @@
+# Default values for smokeping.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: quay.io/superq/smokeping-prober
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "latest"
+
+config: 
+  targets:
+  - hosts:
+    - 8.8.8.8
+    - 1.1.1.1
+    interval: 1s # Duration, Default 1s.
+    network: ip # One of ip, ip4, ip6. Default: ip (automatic IPv4/IPv6)
+    protocol: icmp # One of icmp, udp. Default: icmp (Requires privileged operation)
+    size: 56 # Packet data size in bytes. Default 56 (Range: 24 - 65535)
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 9374
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+prometheus:
+  enabled: true
+  spec:
+    replicas: 1
+    resources:
+      requests:
+        memory: 50Mi
+
+  serviceMonitor:
+    # -- If enabled, ServiceMonitor resources for Prometheus Operator are created
+    enabled: true
+    # -- Alternative namespace for ServiceMonitor resources
+    namespace: null
+    # -- Namespace selector for ServiceMonitor resources
+    namespaceSelector: {}
+    # -- ServiceMonitor annotations
+    annotations: {}
+    # -- Additional ServiceMonitor labels
+    labels: {}
+    # -- ServiceMonitor scrape interval
+    interval: null
+    # -- ServiceMonitor scrape timeout in Go duration format (e.g. 15s)
+    scrapeTimeout: null
+    # -- ServiceMonitor relabel configs to apply to samples before scraping
+    # https://github.com/prometheus-operator/prometheus-operator/blob/master/Documentation/api.md#relabelconfig
+    relabelings: []
+    # -- ServiceMonitor metric relabel configs to apply to samples before ingestion
+    # https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api.md#endpoint
+    metricRelabelings: []
+    # --ServiceMonitor will add labels from the service to the Prometheus metric
+    # https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api.md#servicemonitorspec
+    targetLabels: []
+    # -- ServiceMonitor will use http by default, but you can pick https as well
+    scheme: http
+    # -- ServiceMonitor will use these tlsConfig settings to make the health check requests
+    tlsConfig: null

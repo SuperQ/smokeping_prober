@@ -1,0 +1,13 @@
+{{- if .Values.prometheus.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: {{ include "smokeping.fullname" . }}
+spec:
+  {{ tpl (toYaml .Values.prometheus.spec) . | nindent 2 }}
+  serviceMonitorSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ include "smokeping.fullname" . }}
+      app.kubernetes.io/component: smokeping-prober
+  serviceAccountName: {{ include "smokeping.fullname" . }}-prometheus
+{{end}}
