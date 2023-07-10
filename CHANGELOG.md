@@ -5,6 +5,12 @@
 * [ENHANCEMENT]
 * [BUGFIX]
 
+## 0.7.0 / 2023-07-10
+
+* [FEATURE] Make source ip configurable #83
+* [FEATURE] Add metrics for send and receive errors #109
+* [FEATURE] Enable native histograms  #108
+
 ## 0.6.1 / 2022-06-08
 
 * [BUGFIX] Fix RecordRtts memory leak for config file targets #73

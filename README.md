@@ -54,6 +54,7 @@ targets:
   network: ip # One of ip, ip4, ip6. Default: ip (automatic IPv4/IPv6)
   protocol: icmp # One of icmp, udp. Default: icmp (Requires privileged operation)
   size: 56 # Packet data size in bytes. Default 56 (Range: 24 - 65535)
+  source: 127.0.1.1 # Souce IP address to use. Default: None (automatic selection)
 ```
 
 In each host group the `interval`, `network`, and `protocol` are optional.
@@ -87,6 +88,10 @@ docker run \
 ----------------------------------------|------------|-------------------------------------------
  smokeping\_requests\_total             | Counter    | Counter of pings sent.
  smokeping\_response\_duration\_seconds | Histogram  | Ping response duration.
+ smokeping\_response\_ttl               | Gauge      | The last response Time To Live (TTL).
+ smokeping\_response\_duplicates\_total | Counter    | The number of duplicated response packets.
+ smokeping\_receive\_errors\_total      | Counter    | The number of errors when Pinger attempts to receive packets.
+ smokeping\_send\_errors\_total         | Counter    | The number of errors when Pinger attempts to send packets.
 
 ### TLS and basic authentication
 
