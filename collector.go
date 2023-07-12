@@ -15,6 +15,8 @@
 package main
 
 import (
+	"net"
+
 	"github.com/prometheus-community/pro-bing"
 
 	"github.com/go-kit/log/level"
@@ -110,6 +112,12 @@ func NewSmokepingCollector(pingers *[]*probing.Pinger, pingResponseSeconds prome
 				stats.AvgRtt, "max_rtt", stats.MaxRtt, "stddev_rtt", stats.StdDevRtt)
 		}
 		pinger.OnRecvError = func(err error) {
+			if neterr, ok := err.(*net.OpError); ok {
+				if neterr.Timeout() {
+					// Ignore read timeout errors, these are handled by the pinger.
+					return
+				}
+			}
 			pingRecvErrors.Inc()
 			level.Debug(logger).Log("msg", "Error receiving packet", "error", err)
 		}
