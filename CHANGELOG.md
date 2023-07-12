@@ -5,6 +5,10 @@
 * [ENHANCEMENT]
 * [BUGFIX]
 
+## 0.7.1 / 2023-06-12
+
+* [BUGFIX] Ignore network read timeout errors #115
+
 ## 0.7.0 / 2023-07-10
 
 * [FEATURE] Make source ip configurable #83
