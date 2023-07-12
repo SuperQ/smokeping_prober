@@ -5,7 +5,7 @@
 * [ENHANCEMENT]
 * [BUGFIX]
 
-## 0.7.1 / 2023-06-12
+## 0.7.1 / 2023-07-12
 
 * [BUGFIX] Ignore network read timeout errors #115
 
