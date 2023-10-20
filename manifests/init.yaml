@@ -1,0 +1,128 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: smokeping
+  labels:
+    app.kubernetes.io/name: smokeping-prober
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: smokeping-prober
+  labels:
+    app.kubernetes.io/name: smokeping-prober
+spec:
+  selector:
+    app.kubernetes.io/name: smokeping-prober
+  ports:
+    - name: metrics
+      port: 9374
+      targetPort: metrics
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: deployer
+  namespace: smokeping
+  labels:
+    app.kubernetes.io/name: smokeping-prober
+
+---
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/service-account-token
+metadata:
+  name: deployer-token
+  namespace: smokeping
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: deployer
+  namespace: smokeping
+  labels:
+    app.kubernetes.io/name: smokeping-prober
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: deployer
+subjects:
+  - kind: ServiceAccount
+    name: deployer
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: deployer
+  namespace: smokeping
+  labels:
+    app.kubernetes.io/name: smokeping-prober
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - services
+      - secrets
+    verbs:
+      - get
+      - create
+      - update
+      - patch
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+    verbs:
+      - get
+      - create
+      - update
+      - patch
+  - apiGroups:
+      - batch
+    resources:
+      - cronjobs
+    verbs:
+      - get
+      - create
+      - update
+      - patch
+  - apiGroups:
+      - policy
+    resources:
+      - poddisruptionbudgets
+    verbs:
+      - get
+      - create
+      - update
+      - patch
+  - apiGroups:
+      - monitoring.coreos.com
+    resources:
+      - servicemonitors
+      - prometheusrules
+    verbs:
+      - get
+      - create
+      - update
+      - patch
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app.kubernetes.io/name: smokeping-prober
+  name: smokeping-prober
+  namespace: smokeping
+spec:
+  endpoints:
+    - port: metrics
+  namespaceSelector:
+    matchNames:
+      - smokeping
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: smokeping-prober

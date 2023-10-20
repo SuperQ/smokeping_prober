@@ -4,3 +4,11 @@ smokeping_prober
 /.release
 /.tarballs
 /vendor
+
+.idea/
+
+manifests/secret.yaml
+
+magefiles/static-output
+
+main

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package cmd
 
 import (
 	"errors"
@@ -24,8 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elisasre/smokeping_prober/config"
 	"github.com/prometheus-community/pro-bing"
-	"github.com/superq/smokeping_prober/config"
 
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/go-kit/log"
@@ -92,7 +92,7 @@ func parseBuckets(buckets string) ([]float64, error) {
 	return bucketlist, nil
 }
 
-func main() {
+func Execute() {
 	var (
 		configFile  = kingpin.Flag("config.file", "Optional smokeping_prober configuration yaml file.").String()
 		metricsPath = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()

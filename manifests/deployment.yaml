@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smokeping-prober
+  namespace: smokeping
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: smokeping-prober
+  template:
+    metadata:
+      labels:
+        app: smokeping-prober
+    spec:
+      containers:
+        - name: your-app-container
+          image: your-image-name:tag
+          ports:
+            - containerPort: 9374
