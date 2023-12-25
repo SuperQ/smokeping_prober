@@ -32,7 +32,7 @@ var (
 	configReloadSuccess = promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "config_last_reload_successful",
-		Help:      "Blackbox exporter config loaded successfully.",
+		Help:      "smokeping_prober config loaded successfully.",
 	})
 
 	configReloadSeconds = promauto.NewGauge(prometheus.GaugeOpts{
