@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/prometheus-community/pro-bing"
+	probing "github.com/prometheus-community/pro-bing"
 	"github.com/superq/smokeping_prober/config"
 
 	"github.com/alecthomas/kingpin/v2"
@@ -138,6 +138,8 @@ func main() {
 	pingResponseSeconds := newPingResponseHistogram(bucketlist, *factor)
 	prometheus.MustRegister(pingResponseSeconds)
 
+	targetGroupNamesByPinger := make(map[*probing.Pinger]string)
+
 	pingers := make([]*probing.Pinger, len(*hosts))
 	var pinger *probing.Pinger
 	var host string
@@ -187,6 +189,7 @@ func main() {
 				os.Exit(1)
 			}
 			pingers = append(pingers, pinger)
+			targetGroupNamesByPinger[pinger] = targetGroup.Name
 		}
 	}
 	sc.Unlock()
@@ -200,12 +203,14 @@ func main() {
 	level.Info(logger).Log("msg", fmt.Sprintf("Waiting %s between starting pingers", splay))
 	g := new(errgroup.Group)
 	for _, pinger := range pingers {
-		level.Info(logger).Log("msg", "Starting prober", "address", pinger.Addr(), "interval", pinger.Interval, "size_bytes", pinger.Size, "source", pinger.Source)
+		level.Info(logger).Log("msg", "Starting prober", "address", pinger.Addr(),
+			"interval", pinger.Interval, "size_bytes", pinger.Size, "source", pinger.Source,
+			"target", targetGroupNamesByPinger[pinger])
 		g.Go(pinger.Run)
 		time.Sleep(splay)
 	}
 
-	prometheus.MustRegister(NewSmokepingCollector(&pingers, *pingResponseSeconds))
+	prometheus.MustRegister(NewSmokepingCollector(&pingers, targetGroupNamesByPinger, *pingResponseSeconds))
 
 	http.Handle(*metricsPath, promhttp.Handler())
 	if *metricsPath != "/" && *metricsPath != "" {

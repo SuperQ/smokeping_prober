@@ -17,7 +17,7 @@ package main
 import (
 	"net"
 
-	"github.com/prometheus-community/pro-bing"
+	probing "github.com/prometheus-community/pro-bing"
 
 	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
@@ -29,7 +29,7 @@ const (
 )
 
 var (
-	labelNames = []string{"ip", "host", "source"}
+	labelNames = []string{"ip", "host", "source", "target"}
 
 	pingResponseTTL = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -79,29 +79,33 @@ func newPingResponseHistogram(buckets []float64, factor float64) *prometheus.His
 
 // SmokepingCollector collects metrics from the pinger.
 type SmokepingCollector struct {
-	pingers *[]*probing.Pinger
+	pingers          *[]*probing.Pinger
+	targetGroupNames map[*probing.Pinger]string
 
 	requestsSent *prometheus.Desc
 }
 
-func NewSmokepingCollector(pingers *[]*probing.Pinger, pingResponseSeconds prometheus.HistogramVec) *SmokepingCollector {
+func NewSmokepingCollector(pingers *[]*probing.Pinger, targetGroupNames map[*probing.Pinger]string, pingResponseSeconds prometheus.HistogramVec) *SmokepingCollector {
 	for _, pinger := range *pingers {
+
+		targetGroupName := targetGroupNames[pinger]
+
 		// Init all metrics to 0s.
 		ipAddr := pinger.IPAddr().String()
-		pingResponseDuplicates.WithLabelValues(ipAddr, pinger.Addr(), pinger.Source)
-		pingResponseSeconds.WithLabelValues(ipAddr, pinger.Addr(), pinger.Source)
-		pingResponseTTL.WithLabelValues(ipAddr, pinger.Addr(), pinger.Source)
-		pingSendErrors.WithLabelValues(ipAddr, pinger.Addr(), pinger.Source)
+		pingResponseDuplicates.WithLabelValues(ipAddr, pinger.Addr(), pinger.Source, targetGroupName)
+		pingResponseSeconds.WithLabelValues(ipAddr, pinger.Addr(), pinger.Source, targetGroupName)
+		pingResponseTTL.WithLabelValues(ipAddr, pinger.Addr(), pinger.Source, targetGroupName)
+		pingSendErrors.WithLabelValues(ipAddr, pinger.Addr(), pinger.Source, targetGroupName)
 
 		// Setup handler functions.
 		pinger.OnRecv = func(pkt *probing.Packet) {
-			pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), pkt.Addr, pinger.Source).Observe(pkt.Rtt.Seconds())
-			pingResponseTTL.WithLabelValues(pkt.IPAddr.String(), pkt.Addr, pinger.Source).Set(float64(pkt.TTL))
+			pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), pkt.Addr, pinger.Source, targetGroupName).Observe(pkt.Rtt.Seconds())
+			pingResponseTTL.WithLabelValues(pkt.IPAddr.String(), pkt.Addr, pinger.Source, targetGroupName).Set(float64(pkt.TTL))
 			level.Debug(logger).Log("msg", "Echo reply", "ip_addr", pkt.IPAddr,
 				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL)
 		}
 		pinger.OnDuplicateRecv = func(pkt *probing.Packet) {
-			pingResponseDuplicates.WithLabelValues(pkt.IPAddr.String(), pkt.Addr, pinger.Source).Inc()
+			pingResponseDuplicates.WithLabelValues(pkt.IPAddr.String(), pkt.Addr, pinger.Source, targetGroupName).Inc()
 			level.Debug(logger).Log("msg", "Echo reply (DUP!)", "ip_addr", pkt.IPAddr,
 				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL)
 		}
@@ -122,14 +126,15 @@ func NewSmokepingCollector(pingers *[]*probing.Pinger, pingResponseSeconds prome
 			level.Debug(logger).Log("msg", "Error receiving packet", "error", err)
 		}
 		pinger.OnSendError = func(pkt *probing.Packet, err error) {
-			pingSendErrors.WithLabelValues(pkt.IPAddr.String(), pkt.Addr, pinger.Source).Inc()
+			pingSendErrors.WithLabelValues(pkt.IPAddr.String(), pkt.Addr, pinger.Source, targetGroupName).Inc()
 			level.Debug(logger).Log("msg", "Error sending packet", "ip_addr", pkt.IPAddr,
 				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL, "error", err)
 		}
 	}
 
 	return &SmokepingCollector{
-		pingers: pingers,
+		pingers:          pingers,
+		targetGroupNames: targetGroupNames,
 		requestsSent: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "", "requests_total"),
 			"Number of ping requests sent",
@@ -145,6 +150,7 @@ func (s *SmokepingCollector) Describe(ch chan<- *prometheus.Desc) {
 
 func (s *SmokepingCollector) Collect(ch chan<- prometheus.Metric) {
 	for _, pinger := range *s.pingers {
+		targetGroupName := s.targetGroupNames[pinger]
 		stats := pinger.Statistics()
 
 		ch <- prometheus.MustNewConstMetric(
@@ -154,6 +160,7 @@ func (s *SmokepingCollector) Collect(ch chan<- prometheus.Metric) {
 			stats.IPAddr.String(),
 			stats.Addr,
 			pinger.Source,
+			targetGroupName,
 		)
 	}
 }
