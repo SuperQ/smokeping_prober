@@ -1,0 +1,29 @@
+name: build-and-push
+on: 
+  workflow_run:
+    workflows: ['golangci-lint']
+    types:
+      - completed
+
+jobs:
+  build_and_push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Get short SHA
+        id: shortsha
+        run: echo "::set-output name=sha::$(git rev-parse --short ${{ github.sha }})"
+      - name: Log in to the Container registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push Docker image
+        run: |
+          docker build -t ghcr.io/${{ github.repository }}:${{ steps.shortsha.outputs.sha }} .
+          docker push ghcr.io/${{ github.repository }}:${{ steps.shortsha.outputs.sha }}

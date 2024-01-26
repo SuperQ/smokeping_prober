@@ -7,6 +7,7 @@ on:
       - "**.go"
       - "scripts/errcheck_excludes.txt"
       - ".github/workflows/golangci-lint.yml"
+      - ".github/workflows/build-and-push.yml"
       - ".golangci.yml"
   pull_request:
 
