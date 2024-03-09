@@ -1,10 +1,9 @@
 go:
   # This must match .circle/config.yml.
-  version: 1.20
+  version: 1.22
 repository:
   path: github.com/superq/smokeping_prober
 build:
-  flags: -a -tags 'netgo static_build'
   ldflags: |
     -X github.com/prometheus/common/version.Version={{.Version}}
     -X github.com/prometheus/common/version.Revision={{.Revision}}
