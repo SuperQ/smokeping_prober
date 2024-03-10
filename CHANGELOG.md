@@ -5,6 +5,10 @@
 * [ENHANCEMENT]
 * [BUGFIX]
 
+## 0.7.3 / 2024-03-10
+
+* [BUGFIX] Fix incorrect label setting #141 #142
+
 ## 0.7.2 / 2024-03-09
 
 * [BUGFIX] Fix config_last_reload_successful description #127
