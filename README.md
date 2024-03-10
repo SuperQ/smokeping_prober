@@ -55,6 +55,7 @@ targets:
   protocol: icmp # One of icmp, udp. Default: icmp (Requires privileged operation)
   size: 56 # Packet data size in bytes. Default 56 (Range: 24 - 65535)
   source: 127.0.1.1 # Souce IP address to use. Default: None (automatic selection)
+  name: example-target # Name for the target to include as a 'target' label (Default: none)
 ```
 
 In each host group the `interval`, `network`, and `protocol` are optional.
