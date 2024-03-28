@@ -61,7 +61,7 @@ In each host group the `interval`, `network`, and `protocol` are optional.
 
 The interval Duration is in [Go time.ParseDuration()](https://golang.org/pkg/time/#ParseDuration) syntax.
 
-NOTE: The config is only read on startup, SIGHUP is not supported (yet).
+The config is read on startup, and can be reloaded with the SIGHUP signal.
 
 ## Building and running
 

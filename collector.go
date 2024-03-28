@@ -17,7 +17,7 @@ package main
 import (
 	"net"
 
-	"github.com/prometheus-community/pro-bing"
+	probing "github.com/prometheus-community/pro-bing"
 
 	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
@@ -84,8 +84,28 @@ type SmokepingCollector struct {
 	requestsSent *prometheus.Desc
 }
 
-func NewSmokepingCollector(pingers *[]*probing.Pinger, pingResponseSeconds prometheus.HistogramVec) *SmokepingCollector {
-	for _, pinger := range *pingers {
+func NewSmokepingCollector(pingers []*probing.Pinger, pingResponseSeconds prometheus.HistogramVec) *SmokepingCollector {
+
+	instance := SmokepingCollector{
+		requestsSent: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "requests_total"),
+			"Number of ping requests sent",
+			labelNames,
+			nil,
+		),
+	}
+
+	instance.updatePingers(pingers, pingResponseSeconds)
+
+	return &instance
+}
+
+func (s *SmokepingCollector) updatePingers(pingers []*probing.Pinger, pingResponseSeconds prometheus.HistogramVec) {
+	pingResponseDuplicates.Reset()
+	pingResponseSeconds.Reset()
+	pingResponseTTL.Reset()
+	pingSendErrors.Reset()
+	for _, pinger := range pingers {
 		// Init all metrics to 0s.
 		ipAddr := pinger.IPAddr().String()
 		host := pinger.Addr()
@@ -129,16 +149,7 @@ func NewSmokepingCollector(pingers *[]*probing.Pinger, pingResponseSeconds prome
 				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL, "error", err)
 		}
 	}
-
-	return &SmokepingCollector{
-		pingers: pingers,
-		requestsSent: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "requests_total"),
-			"Number of ping requests sent",
-			labelNames,
-			nil,
-		),
-	}
+	s.pingers = &pingers
 }
 
 func (s *SmokepingCollector) Describe(ch chan<- *prometheus.Desc) {

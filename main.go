@@ -20,11 +20,13 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
-	"github.com/prometheus-community/pro-bing"
+	probing "github.com/prometheus-community/pro-bing"
 	"github.com/superq/smokeping_prober/config"
 
 	"github.com/alecthomas/kingpin/v2"
@@ -76,8 +78,107 @@ func HostList(s kingpin.Settings) (target *[]string) {
 	return
 }
 
-func init() {
-	prometheus.MustRegister(versioncollector.NewCollector("smokeping_prober"))
+type smokePingers struct {
+	started     []*probing.Pinger
+	prepared    []*probing.Pinger
+	g           *errgroup.Group
+	maxInterval time.Duration
+}
+
+func (s *smokePingers) sizeOfPrepared() int {
+	if s.prepared != nil {
+		return len(s.prepared)
+	}
+	return 0
+}
+
+func (s *smokePingers) start() {
+	if s.sizeOfPrepared() == 0 {
+		return
+	}
+	if s.g != nil {
+		s.stop()
+	}
+	s.g = new(errgroup.Group)
+	s.started = s.prepared
+	splay := time.Duration(s.maxInterval.Nanoseconds() / int64(len(s.started)))
+	for _, pinger := range s.started {
+		level.Info(logger).Log("msg", "Starting prober", "address", pinger.Addr(), "interval", pinger.Interval, "size_bytes", pinger.Size, "source", pinger.Source)
+		s.g.Go(pinger.Run)
+		time.Sleep(splay)
+	}
+	s.prepared = nil
+}
+
+func (s *smokePingers) stop() error {
+	if s.g == nil {
+		return nil
+	}
+	if s.started == nil {
+		return nil
+	}
+	for _, pinger := range s.started {
+		pinger.Stop()
+	}
+	if err := s.g.Wait(); err != nil {
+		return fmt.Errorf("pingers failed: %v", err)
+	}
+	return nil
+}
+
+func (s *smokePingers) prepare(hosts *[]string, interval *time.Duration, privileged *bool, sizeBytes *int) error {
+	pingers := make([]*probing.Pinger, len(*hosts))
+	var pinger *probing.Pinger
+	var host string
+	for i, host := range *hosts {
+		pinger = probing.New(host)
+
+		err := pinger.Resolve()
+		if err != nil {
+			return fmt.Errorf("failed to resolve pinger: %v", err)
+		}
+
+		level.Info(logger).Log("msg", "Pinger resolved", "host", host, "ip_addr", pinger.IPAddr())
+
+		pinger.Interval = *interval
+		pinger.RecordRtts = false
+		pinger.SetPrivileged(*privileged)
+		pinger.Size = *sizeBytes
+
+		pingers[i] = pinger
+	}
+
+	maxInterval := *interval
+	sc.Lock()
+	for _, targetGroup := range sc.C.Targets {
+		packetSize := targetGroup.Size
+		if packetSize < 24 || packetSize > 65535 {
+			return fmt.Errorf("packet size must be in the range 24-65535, but found '%d' bytes", packetSize)
+		}
+		if targetGroup.Interval > maxInterval {
+			maxInterval = targetGroup.Interval
+		}
+		for _, host = range targetGroup.Hosts {
+			pinger = probing.New(host)
+			pinger.Interval = targetGroup.Interval
+			pinger.RecordRtts = false
+			pinger.SetNetwork(targetGroup.Network)
+			pinger.Size = packetSize
+			pinger.Source = targetGroup.Source
+			if targetGroup.Protocol == "icmp" {
+				pinger.SetPrivileged(true)
+			}
+			err := pinger.Resolve()
+			if err != nil {
+				return fmt.Errorf("failed to resolve pinger: %v", err)
+			}
+			pingers = append(pingers, pinger)
+		}
+	}
+	sc.Unlock()
+	s.prepared = pingers
+	s.maxInterval = maxInterval
+	return nil
 }
 
 func parseBuckets(buckets string) ([]float64, error) {
@@ -93,6 +194,10 @@ func parseBuckets(buckets string) ([]float64, error) {
 	return bucketlist, nil
 }
 
+func init() {
+	prometheus.MustRegister(versioncollector.NewCollector("smokeping_prober"))
+}
+
 func main() {
 	var (
 		configFile  = kingpin.Flag("config.file", "Optional smokeping_prober configuration yaml file.").String()
@@ -106,6 +211,9 @@ func main() {
 		sizeBytes  = kingpin.Flag("ping.size", "Ping packet size in bytes").Short('s').Default("56").Int()
 		hosts      = HostList(kingpin.Arg("hosts", "List of hosts to ping"))
 	)
+
+	var smokePingers smokePingers
+	var smokepingCollector *SmokepingCollector
 
 	promlogConfig := &promlog.Config{}
 	flag.AddFlags(kingpin.CommandLine, promlogConfig)
@@ -139,74 +247,46 @@ func main() {
 	pingResponseSeconds := newPingResponseHistogram(bucketlist, *factor)
 	prometheus.MustRegister(pingResponseSeconds)
 
-	pingers := make([]*probing.Pinger, len(*hosts))
-	var pinger *probing.Pinger
-	var host string
-	for i, host := range *hosts {
-		pinger = probing.New(host)
-
-		err := pinger.Resolve()
-		if err != nil {
-			level.Error(logger).Log("msg", "Failed to resolve pinger", "err", err)
-			os.Exit(1)
-		}
-
-		level.Info(logger).Log("msg", "Pinger resolved", "host", host, "ip_addr", pinger.IPAddr())
-
-		pinger.Interval = *interval
-		pinger.RecordRtts = false
-		pinger.SetPrivileged(*privileged)
-		pinger.Size = *sizeBytes
-
-		pingers[i] = pinger
+	err = smokePingers.prepare(hosts, interval, privileged, sizeBytes)
+	if err != nil {
+		level.Error(logger).Log("err", "Unable to create ping", err)
+		os.Exit(1)
 	}
 
-	maxInterval := *interval
-	sc.Lock()
-	for _, targetGroup := range sc.C.Targets {
-		if targetGroup.Interval > maxInterval {
-			maxInterval = targetGroup.Interval
-		}
-		packetSize := targetGroup.Size
-		if packetSize < 24 || packetSize > 65535 {
-			level.Error(logger).Log("msg", "Invalid packet size. (24-65535)", "bytes", packetSize)
-			os.Exit(1)
-		}
-		for _, host = range targetGroup.Hosts {
-			pinger = probing.New(host)
-			pinger.Interval = targetGroup.Interval
-			pinger.RecordRtts = false
-			pinger.SetNetwork(targetGroup.Network)
-			pinger.Size = packetSize
-			pinger.Source = targetGroup.Source
-			if targetGroup.Protocol == "icmp" {
-				pinger.SetPrivileged(true)
-			}
-			err := pinger.Resolve()
-			if err != nil {
-				level.Error(logger).Log("msg", "failed to resolve pinger", "error", err.Error())
-				os.Exit(1)
-			}
-			pingers = append(pingers, pinger)
-		}
-	}
-	sc.Unlock()
-
-	if len(pingers) == 0 {
+	if smokePingers.sizeOfPrepared() == 0 {
 		level.Error(logger).Log("msg", "no targets specified on command line or in config file")
 		os.Exit(1)
 	}
 
-	splay := time.Duration(interval.Nanoseconds() / int64(len(pingers)))
-	level.Info(logger).Log("msg", fmt.Sprintf("Waiting %s between starting pingers", splay))
-	g := new(errgroup.Group)
-	for _, pinger := range pingers {
-		level.Info(logger).Log("msg", "Starting prober", "address", pinger.Addr(), "interval", pinger.Interval, "size_bytes", pinger.Size, "source", pinger.Source)
-		g.Go(pinger.Run)
-		time.Sleep(splay)
-	}
+	smokePingers.start()
+	smokepingCollector = NewSmokepingCollector(smokePingers.started, *pingResponseSeconds)
+	prometheus.MustRegister(smokepingCollector)
 
-	prometheus.MustRegister(NewSmokepingCollector(&pingers, *pingResponseSeconds))
+	hup := make(chan os.Signal, 1)
+	signal.Notify(hup, syscall.SIGHUP)
+	go func() {
+		for {
+			<-hup
+			if err := sc.ReloadConfig(*configFile); err != nil {
+				level.Error(logger).Log("msg", "Error reloading config", "err", err)
+				continue
+			}
+			err = smokePingers.prepare(hosts, interval, privileged, sizeBytes)
+			if err != nil {
+				level.Error(logger).Log("msg", "Unable to create ping from config", "err", err)
+				continue
+			}
+			if smokePingers.sizeOfPrepared() == 0 {
+				level.Error(logger).Log("msg", "No targets specified on command line or in config file")
+				continue
+			}
+
+			smokePingers.start()
+			smokepingCollector.updatePingers(smokePingers.started, *pingResponseSeconds)
+
+			level.Info(logger).Log("msg", "Reloaded config file")
+		}
+	}()
 
 	http.Handle(*metricsPath, promhttp.Handler())
 	if *metricsPath != "/" && *metricsPath != "" {
@@ -235,11 +315,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	for _, pinger := range pingers {
-		pinger.Stop()
+	err = smokePingers.stop()
+	if err != nil {
+		level.Error(logger).Log("err", err)
 	}
-	if err = g.Wait(); err != nil {
-		level.Error(logger).Log("msg", "pingers failed", "error", err)
-		os.Exit(1)
-	}
+
 }
