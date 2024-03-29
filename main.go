@@ -264,20 +264,37 @@ func main() {
 
 	hup := make(chan os.Signal, 1)
 	signal.Notify(hup, syscall.SIGHUP)
+	reloadCh := make(chan chan error)
 	go func() {
 		for {
-			<-hup
+			var errCallback func(e error)
+			var successCallback func()
+			select {
+			case <-hup:
+				errCallback = func(e error) {}
+				successCallback = func() {}
+			case rc := <-reloadCh:
+				errCallback = func(e error) {
+					rc <- e
+				}
+				successCallback = func() {
+					rc <- nil
+				}
+			}
 			if err := sc.ReloadConfig(*configFile); err != nil {
 				level.Error(logger).Log("msg", "Error reloading config", "err", err)
+				errCallback(err)
 				continue
 			}
 			err = smokePingers.prepare(hosts, interval, privileged, sizeBytes)
 			if err != nil {
 				level.Error(logger).Log("msg", "Unable to create ping from config", "err", err)
+				errCallback(err)
 				continue
 			}
 			if smokePingers.sizeOfPrepared() == 0 {
 				level.Error(logger).Log("msg", "No targets specified on command line or in config file")
+				errCallback(fmt.Errorf("no targets specified"))
 				continue
 			}
 
@@ -285,10 +302,29 @@ func main() {
 			smokepingCollector.updatePingers(smokePingers.started, *pingResponseSeconds)
 
 			level.Info(logger).Log("msg", "Reloaded config file")
+			successCallback()
 		}
 	}()
 
 	http.Handle(*metricsPath, promhttp.Handler())
+	http.HandleFunc("/-/healthy", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Healthy"))
+	})
+	http.HandleFunc("/-/reload",
+		func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != "POST" {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				fmt.Fprintf(w, "This endpoint requires a POST request.\n")
+				return
+			}
+
+			rc := make(chan error)
+			reloadCh <- rc
+			if err := <-rc; err != nil {
+				http.Error(w, fmt.Sprintf("Failed to reload config: %s", err), http.StatusInternalServerError)
+			}
+		})
 	if *metricsPath != "/" && *metricsPath != "" {
 		landingConfig := web.LandingConfig{
 			Name:        "Smokeping Prober",
