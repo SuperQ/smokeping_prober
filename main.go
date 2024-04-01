@@ -26,7 +26,7 @@ import (
 	"syscall"
 	"time"
 
-	probing "github.com/prometheus-community/pro-bing"
+	"github.com/prometheus-community/pro-bing"
 	"github.com/superq/smokeping_prober/config"
 
 	"github.com/alecthomas/kingpin/v2"

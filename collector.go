@@ -17,7 +17,7 @@ package main
 import (
 	"net"
 
-	probing "github.com/prometheus-community/pro-bing"
+	"github.com/prometheus-community/pro-bing"
 
 	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
