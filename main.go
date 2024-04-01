@@ -97,7 +97,10 @@ func (s *smokePingers) start() {
 		return
 	}
 	if s.g != nil {
-		s.stop()
+		err := s.stop()
+		if err != nil {
+			level.Warn(logger).Log("msg", "At least one previous pinger failed to run", "err", err)
+		}
 	}
 	s.g = new(errgroup.Group)
 	s.started = s.prepared
