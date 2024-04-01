@@ -12,7 +12,7 @@
 # limitations under the License.
 
 DOCKER_ARCHS      ?= amd64 armv7 arm64
-DOCKER_REPO       ?= quay.io/superq
+DOCKER_REPO       ?= superque
 DOCKER_IMAGE_NAME ?= smokeping-prober
 
 include Makefile.common
