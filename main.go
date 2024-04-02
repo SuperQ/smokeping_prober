@@ -153,6 +153,7 @@ func (s *smokePingers) prepare(hosts *[]string, interval *time.Duration, privile
 
 	maxInterval := *interval
 	sc.Lock()
+	defer sc.Unlock()
 	for _, targetGroup := range sc.C.Targets {
 		packetSize := targetGroup.Size
 		if packetSize < 24 || packetSize > 65535 {
@@ -178,7 +179,6 @@ func (s *smokePingers) prepare(hosts *[]string, interval *time.Duration, privile
 			pingers = append(pingers, pinger)
 		}
 	}
-	sc.Unlock()
 	s.prepared = pingers
 	s.maxInterval = maxInterval
 	return nil
