@@ -5,6 +5,10 @@
 * [ENHANCEMENT]
 * [BUGFIX]
 
+## 0.8.1 / 2024-04-02
+
+* [BUGFIX] Fix no unlock upon error #148
+
 ## 0.8.0 / 2024-04-02
 
 * [FEATURE] Support runtime config reload #121
