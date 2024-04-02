@@ -5,6 +5,10 @@
 * [ENHANCEMENT]
 * [BUGFIX]
 
+## 0.8.0 / 2024-04-02
+
+* [FEATURE] Support runtime config reload #121
+
 ## 0.7.3 / 2024-03-10
 
 * [BUGFIX] Fix incorrect label setting #141 #142
