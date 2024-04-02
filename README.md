@@ -61,7 +61,7 @@ In each host group the `interval`, `network`, and `protocol` are optional.
 
 The interval Duration is in [Go time.ParseDuration()](https://golang.org/pkg/time/#ParseDuration) syntax.
 
-NOTE: The config is only read on startup, SIGHUP is not supported (yet).
+The config is read on startup, and can be reloaded with the SIGHUP signal, or with an HTTP POST to the URI path `/-/reload`.
 
 ## Building and running
 
@@ -100,3 +100,8 @@ The Smokeping Prober supports TLS and basic authentication.
 To use TLS and/or basic authentication, you need to pass a configuration file
 using the `--web.config.file` parameter. The format of the file is described
 [in the exporter-toolkit repository](https://github.com/prometheus/exporter-toolkit/blob/master/docs/web-configuration.md).
+
+
+### Health check
+
+A health check can be requested in the URI path `/-/healthy`.
