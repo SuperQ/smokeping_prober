@@ -17,9 +17,8 @@ package main
 import (
 	"net"
 
-	"github.com/prometheus-community/pro-bing"
+	probing "github.com/prometheus-community/pro-bing"
 
-	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -119,16 +118,16 @@ func (s *SmokepingCollector) updatePingers(pingers []*probing.Pinger, pingRespon
 		pinger.OnRecv = func(pkt *probing.Packet) {
 			pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), host, source).Observe(pkt.Rtt.Seconds())
 			pingResponseTTL.WithLabelValues(pkt.IPAddr.String(), host, source).Set(float64(pkt.TTL))
-			level.Debug(logger).Log("msg", "Echo reply", "ip_addr", pkt.IPAddr,
+			logger.Debug("Echo reply", "ip_addr", pkt.IPAddr,
 				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL)
 		}
 		pinger.OnDuplicateRecv = func(pkt *probing.Packet) {
 			pingResponseDuplicates.WithLabelValues(pkt.IPAddr.String(), host, source).Inc()
-			level.Debug(logger).Log("msg", "Echo reply (DUP!)", "ip_addr", pkt.IPAddr,
+			logger.Debug("Echo reply (DUP!)", "ip_addr", pkt.IPAddr,
 				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL)
 		}
 		pinger.OnFinish = func(stats *probing.Statistics) {
-			level.Debug(logger).Log("msg", "Ping statistics", "addr", stats.Addr,
+			logger.Debug("Ping statistics", "addr", stats.Addr,
 				"packets_sent", stats.PacketsSent, "packets_received", stats.PacketsRecv,
 				"packet_loss_percent", stats.PacketLoss, "min_rtt", stats.MinRtt, "avg_rtt",
 				stats.AvgRtt, "max_rtt", stats.MaxRtt, "stddev_rtt", stats.StdDevRtt)
@@ -141,11 +140,12 @@ func (s *SmokepingCollector) updatePingers(pingers []*probing.Pinger, pingRespon
 				}
 			}
 			pingRecvErrors.Inc()
-			level.Debug(logger).Log("msg", "Error receiving packet", "error", err)
+			// TODO: @tjhop -- should this be logged at error level?
+			logger.Debug("Error receiving packet", "error", err)
 		}
 		pinger.OnSendError = func(pkt *probing.Packet, err error) {
 			pingSendErrors.WithLabelValues(pkt.IPAddr.String(), host, source).Inc()
-			level.Debug(logger).Log("msg", "Error sending packet", "ip_addr", pkt.IPAddr,
+			logger.Debug("Error sending packet", "ip_addr", pkt.IPAddr,
 				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL, "error", err)
 		}
 	}

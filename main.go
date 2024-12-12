@@ -17,6 +17,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -26,17 +27,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/prometheus-community/pro-bing"
+	probing "github.com/prometheus-community/pro-bing"
 	"github.com/superq/smokeping_prober/config"
 
 	"github.com/alecthomas/kingpin/v2"
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	versioncollector "github.com/prometheus/client_golang/prometheus/collectors/version"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/promlog"
-	"github.com/prometheus/common/promlog/flag"
+	"github.com/prometheus/common/promslog"
+	"github.com/prometheus/common/promslog/flag"
 	"github.com/prometheus/common/version"
 	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/prometheus/exporter-toolkit/web/kingpinflag"
@@ -47,7 +46,7 @@ var (
 	// Generated with: prometheus.ExponentialBuckets(0.00005, 2, 20)
 	defaultBuckets = "5e-05,0.0001,0.0002,0.0004,0.0008,0.0016,0.0032,0.0064,0.0128,0.0256,0.0512,0.1024,0.2048,0.4096,0.8192,1.6384,3.2768,6.5536,13.1072,26.2144"
 
-	logger log.Logger
+	logger *slog.Logger
 
 	sc = &config.SafeConfig{
 		C: &config.Config{},
@@ -99,14 +98,14 @@ func (s *smokePingers) start() {
 	if s.g != nil {
 		err := s.stop()
 		if err != nil {
-			level.Warn(logger).Log("msg", "At least one previous pinger failed to run", "err", err)
+			logger.Warn("At least one previous pinger failed to run", "err", err)
 		}
 	}
 	s.g = new(errgroup.Group)
 	s.started = s.prepared
 	splay := time.Duration(s.maxInterval.Nanoseconds() / int64(len(s.started)))
 	for _, pinger := range s.started {
-		level.Info(logger).Log("msg", "Starting prober", "address", pinger.Addr(), "interval", pinger.Interval, "size_bytes", pinger.Size, "source", pinger.Source)
+		logger.Info("Starting prober", "address", pinger.Addr(), "interval", pinger.Interval, "size_bytes", pinger.Size, "source", pinger.Source)
 		s.g.Go(pinger.Run)
 		time.Sleep(splay)
 	}
@@ -141,7 +140,7 @@ func (s *smokePingers) prepare(hosts *[]string, interval *time.Duration, privile
 			return fmt.Errorf("failed to resolve pinger: %v", err)
 		}
 
-		level.Info(logger).Log("msg", "Pinger resolved", "host", host, "ip_addr", pinger.IPAddr())
+		logger.Info("Pinger resolved", "host", host, "ip_addr", pinger.IPAddr())
 
 		pinger.Interval = *interval
 		pinger.RecordRtts = false
@@ -218,33 +217,33 @@ func main() {
 	var smokePingers smokePingers
 	var smokepingCollector *SmokepingCollector
 
-	promlogConfig := &promlog.Config{}
-	flag.AddFlags(kingpin.CommandLine, promlogConfig)
+	promslogConfig := &promslog.Config{}
+	flag.AddFlags(kingpin.CommandLine, promslogConfig)
 	kingpin.Version(version.Print("smokeping_prober"))
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
-	logger = promlog.New(promlogConfig)
+	logger = promslog.New(promslogConfig)
 
-	level.Info(logger).Log("msg", "Starting smokeping_prober", "version", version.Info())
-	level.Info(logger).Log("msg", "Build context", "build_context", version.BuildContext())
+	logger.Info("Starting smokeping_prober", "version", version.Info())
+	logger.Info("Build context", "build_context", version.BuildContext())
 
 	if *sizeBytes < 24 || *sizeBytes > 65535 {
-		level.Error(logger).Log("msg", "Invalid packet size. (24-65535)", "bytes", *sizeBytes)
+		logger.Error("Invalid packet size. (24-65535)", "bytes", *sizeBytes)
 		os.Exit(1)
 	}
 
 	if err := sc.ReloadConfig(*configFile); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			level.Info(logger).Log("msg", "ignoring missing config file", "filename", *configFile)
+			logger.Info("ignoring missing config file", "filename", *configFile)
 		} else {
-			level.Error(logger).Log("msg", "error loading config", "filename", err.Error())
+			logger.Error("error loading config", "filename", err.Error())
 			os.Exit(1)
 		}
 	}
 
 	bucketlist, err := parseBuckets(*buckets)
 	if err != nil {
-		level.Error(logger).Log("msg", "Failed to parse buckets", "err", err)
+		logger.Error("Failed to parse buckets", "err", err)
 		os.Exit(1)
 	}
 	pingResponseSeconds := newPingResponseHistogram(bucketlist, *factor)
@@ -252,12 +251,12 @@ func main() {
 
 	err = smokePingers.prepare(hosts, interval, privileged, sizeBytes)
 	if err != nil {
-		level.Error(logger).Log("err", "Unable to create ping", err)
+		logger.Error("Unable to create ping", "err", err)
 		os.Exit(1)
 	}
 
 	if smokePingers.sizeOfPrepared() == 0 {
-		level.Error(logger).Log("msg", "no targets specified on command line or in config file")
+		logger.Error("no targets specified on command line or in config file")
 		os.Exit(1)
 	}
 
@@ -285,18 +284,18 @@ func main() {
 				}
 			}
 			if err := sc.ReloadConfig(*configFile); err != nil {
-				level.Error(logger).Log("msg", "Error reloading config", "err", err)
+				logger.Error("Error reloading config", "err", err)
 				errCallback(err)
 				continue
 			}
 			err = smokePingers.prepare(hosts, interval, privileged, sizeBytes)
 			if err != nil {
-				level.Error(logger).Log("msg", "Unable to create ping from config", "err", err)
+				logger.Error("Unable to create ping from config", "err", err)
 				errCallback(err)
 				continue
 			}
 			if smokePingers.sizeOfPrepared() == 0 {
-				level.Error(logger).Log("msg", "No targets specified on command line or in config file")
+				logger.Error("No targets specified on command line or in config file")
 				errCallback(fmt.Errorf("no targets specified"))
 				continue
 			}
@@ -304,7 +303,7 @@ func main() {
 			smokePingers.start()
 			smokepingCollector.updatePingers(smokePingers.started, *pingResponseSeconds)
 
-			level.Info(logger).Log("msg", "Reloaded config file")
+			logger.Info("Reloaded config file")
 			successCallback()
 		}
 	}()
@@ -342,7 +341,7 @@ func main() {
 		}
 		landingPage, err := web.NewLandingPage(landingConfig)
 		if err != nil {
-			level.Error(logger).Log("err", err)
+			logger.Error("Failed to created landing page", "err", err)
 			os.Exit(1)
 		}
 		http.Handle("/", landingPage)
@@ -350,13 +349,13 @@ func main() {
 
 	server := &http.Server{}
 	if err := web.ListenAndServe(server, webConfig, logger); err != nil {
-		level.Error(logger).Log("err", err)
+		logger.Error("Failed to run web server", "err", err)
 		os.Exit(1)
 	}
 
 	err = smokePingers.stop()
 	if err != nil {
-		level.Error(logger).Log("err", err)
+		logger.Error("Failed to run smoke pingers", "err", err)
 	}
 
 }
