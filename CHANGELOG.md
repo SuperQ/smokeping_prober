@@ -5,6 +5,13 @@
 * [ENHANCEMENT]
 * [BUGFIX]
 
+## 0.9.0 / 2025-01-21
+
+Note that this version now uses a BPF filter in privileged mode to improve perforamnce.
+
+* [CHANGE] Update logging to Go slog library #173
+* [ENHANCEMENT] Improve performance #178
+
 ## 0.8.1 / 2024-04-02
 
 * [BUGFIX] Fix no unlock upon error #148
