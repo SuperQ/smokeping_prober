@@ -105,7 +105,7 @@ func (s *smokePingers) start() {
 	s.started = s.prepared
 	splay := time.Duration(s.maxInterval.Nanoseconds() / int64(len(s.started)))
 	for _, pinger := range s.started {
-		logger.Info("Starting prober", "address", pinger.Addr(), "interval", pinger.Interval, "size_bytes", pinger.Size, "source", pinger.Source)
+		logger.Info("Starting prober", "address", pinger.Addr(), "interval", pinger.Interval, "size_bytes", pinger.Size, "source_address", pinger.Source)
 		s.g.Go(pinger.Run)
 		time.Sleep(splay)
 	}
