@@ -39,6 +39,7 @@ import (
 	"github.com/prometheus/common/version"
 	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/prometheus/exporter-toolkit/web/kingpinflag"
+	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -230,6 +231,13 @@ func main() {
 	if *sizeBytes < 24 || *sizeBytes > 65535 {
 		logger.Error("Invalid packet size. (24-65535)", "bytes", *sizeBytes)
 		os.Exit(1)
+	}
+
+	l := func(format string, a ...interface{}) {
+		logger.Info(fmt.Sprintf(strings.TrimPrefix(format, "maxprocs: "), a...), "component", "automaxprocs")
+	}
+	if _, err := maxprocs.Set(maxprocs.Logger(l)); err != nil {
+		logger.Warn("Failed to set GOMAXPROCS automatically", "component", "automaxprocs", "err", err)
 	}
 
 	if err := sc.ReloadConfig(*configFile); err != nil {
