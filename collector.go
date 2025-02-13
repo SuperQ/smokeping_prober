@@ -15,6 +15,7 @@
 package main
 
 import (
+	"fmt"
 	"net"
 
 	probing "github.com/prometheus-community/pro-bing"
@@ -28,7 +29,7 @@ const (
 )
 
 var (
-	labelNames = []string{"ip", "host", "source"}
+	labelNames = []string{"ip", "host", "source", "tos"}
 
 	pingResponseTTL = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -109,20 +110,21 @@ func (s *SmokepingCollector) updatePingers(pingers []*probing.Pinger, pingRespon
 		ipAddr := pinger.IPAddr().String()
 		host := pinger.Addr()
 		source := pinger.Source
-		pingResponseDuplicates.WithLabelValues(ipAddr, host, source)
-		pingResponseSeconds.WithLabelValues(ipAddr, host, source)
-		pingResponseTTL.WithLabelValues(ipAddr, host, source)
-		pingSendErrors.WithLabelValues(ipAddr, host, source)
+		tos := fmt.Sprintf("%d", pinger.TrafficClass())
+		pingResponseDuplicates.WithLabelValues(ipAddr, host, source, tos)
+		pingResponseSeconds.WithLabelValues(ipAddr, host, source, tos)
+		pingResponseTTL.WithLabelValues(ipAddr, host, source, tos)
+		pingSendErrors.WithLabelValues(ipAddr, host, source, tos)
 
 		// Setup handler functions.
 		pinger.OnRecv = func(pkt *probing.Packet) {
-			pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), host, source).Observe(pkt.Rtt.Seconds())
-			pingResponseTTL.WithLabelValues(pkt.IPAddr.String(), host, source).Set(float64(pkt.TTL))
+			pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), host, source, tos).Observe(pkt.Rtt.Seconds())
+			pingResponseTTL.WithLabelValues(pkt.IPAddr.String(), host, source, tos).Set(float64(pkt.TTL))
 			logger.Debug("Echo reply", "ip_addr", pkt.IPAddr,
 				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL)
 		}
 		pinger.OnDuplicateRecv = func(pkt *probing.Packet) {
-			pingResponseDuplicates.WithLabelValues(pkt.IPAddr.String(), host, source).Inc()
+			pingResponseDuplicates.WithLabelValues(pkt.IPAddr.String(), host, source, tos).Inc()
 			logger.Debug("Echo reply (DUP!)", "ip_addr", pkt.IPAddr,
 				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL)
 		}
@@ -144,7 +146,7 @@ func (s *SmokepingCollector) updatePingers(pingers []*probing.Pinger, pingRespon
 			logger.Debug("Error receiving packet", "error", err)
 		}
 		pinger.OnSendError = func(pkt *probing.Packet, err error) {
-			pingSendErrors.WithLabelValues(pkt.IPAddr.String(), host, source).Inc()
+			pingSendErrors.WithLabelValues(pkt.IPAddr.String(), host, source, tos).Inc()
 			logger.Debug("Error sending packet", "ip_addr", pkt.IPAddr,
 				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL, "error", err)
 		}
@@ -167,6 +169,7 @@ func (s *SmokepingCollector) Collect(ch chan<- prometheus.Metric) {
 			stats.IPAddr.String(),
 			stats.Addr,
 			pinger.Source,
+			fmt.Sprintf("%d", pinger.TrafficClass()),
 		)
 	}
 }
