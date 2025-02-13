@@ -7,3 +7,4 @@ targets:
   protocol: icmp # One of icmp, udp. Default: icmp (Requires privileged operation)
   size: 56 # Packet data size in bytes. Default 56 (Range: 24 - 65535)
   source: 127.0.1.1 # Souce IP address to use. Default: None (automatic selection)
+  tos: 0x00 # Packet ToS field in decimal, hexadecimal or binary format. Default: 0 (Range: 0-255)
