@@ -7,7 +7,7 @@ require (
 	github.com/prometheus-community/pro-bing v0.6.1
 	github.com/prometheus/client_golang v1.21.0
 	github.com/prometheus/common v0.62.0
-	github.com/prometheus/exporter-toolkit v0.13.2
+	github.com/prometheus/exporter-toolkit v0.14.0
 	go.uber.org/automaxprocs v1.6.0
 	golang.org/x/sync v0.11.0
 	gopkg.in/yaml.v2 v2.4.0
