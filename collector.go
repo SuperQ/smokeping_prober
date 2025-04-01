@@ -15,8 +15,8 @@
 package main
 
 import (
-	"fmt"
 	"net"
+	"strconv"
 
 	probing "github.com/prometheus-community/pro-bing"
 
@@ -110,7 +110,7 @@ func (s *SmokepingCollector) updatePingers(pingers []*probing.Pinger, pingRespon
 		ipAddr := pinger.IPAddr().String()
 		host := pinger.Addr()
 		source := pinger.Source
-		tos := fmt.Sprintf("%d", pinger.TrafficClass())
+		tos := strconv.Itoa(int(pinger.TrafficClass()))
 		pingResponseDuplicates.WithLabelValues(ipAddr, host, source, tos)
 		pingResponseSeconds.WithLabelValues(ipAddr, host, source, tos)
 		pingResponseTTL.WithLabelValues(ipAddr, host, source, tos)
@@ -169,7 +169,7 @@ func (s *SmokepingCollector) Collect(ch chan<- prometheus.Metric) {
 			stats.IPAddr.String(),
 			stats.Addr,
 			pinger.Source,
-			fmt.Sprintf("%d", pinger.TrafficClass()),
+			strconv.Itoa(int(pinger.TrafficClass())),
 		)
 	}
 }
