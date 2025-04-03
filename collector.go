@@ -121,12 +121,12 @@ func (s *SmokepingCollector) updatePingers(pingers []*probing.Pinger, pingRespon
 			pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), host, source, tos).Observe(pkt.Rtt.Seconds())
 			pingResponseTTL.WithLabelValues(pkt.IPAddr.String(), host, source, tos).Set(float64(pkt.TTL))
 			logger.Debug("Echo reply", "ip_addr", pkt.IPAddr,
-				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL)
+				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "rtt", pkt.Rtt, "ttl", pkt.TTL, "tos", tos)
 		}
 		pinger.OnDuplicateRecv = func(pkt *probing.Packet) {
 			pingResponseDuplicates.WithLabelValues(pkt.IPAddr.String(), host, source, tos).Inc()
 			logger.Debug("Echo reply (DUP!)", "ip_addr", pkt.IPAddr,
-				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL)
+				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "rtt", pkt.Rtt, "ttl", pkt.TTL, "tos", tos)
 		}
 		pinger.OnFinish = func(stats *probing.Statistics) {
 			logger.Debug("Ping statistics", "addr", stats.Addr,
@@ -148,7 +148,7 @@ func (s *SmokepingCollector) updatePingers(pingers []*probing.Pinger, pingRespon
 		pinger.OnSendError = func(pkt *probing.Packet, err error) {
 			pingSendErrors.WithLabelValues(pkt.IPAddr.String(), host, source, tos).Inc()
 			logger.Debug("Error sending packet", "ip_addr", pkt.IPAddr,
-				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL, "error", err)
+				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "rtt", pkt.Rtt, "ttl", pkt.TTL, "tos", tos, "error", err)
 		}
 	}
 	s.pingers = &pingers
