@@ -5,6 +5,11 @@
 * [ENHANCEMENT]
 * [BUGFIX]
 
+## 0.10.0 / 2025-04-07
+
+* [FEATURE] Add traffic class setting #181
+* [BUGFIX] Rename time logging field #192
+
 ## 0.9.0 / 2025-01-21
 
 Note that this version now uses a BPF filter in privileged mode to improve perforamnce.
