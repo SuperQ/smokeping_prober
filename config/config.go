@@ -89,13 +89,15 @@ func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
 }
 
 type TargetGroup struct {
-	Hosts    []string      `yaml:"hosts"`
-	Interval time.Duration `yaml:"interval,omitempty"`
-	Network  string        `yaml:"network,omitempty"`
-	Protocol string        `yaml:"protocol,omitempty"`
-	Size     int           `yaml:"size,omitempty"`
-	Source   string        `yaml:"source,omitempty"`
-	ToS      uint8         `yaml:"tos,omitempty"`
+	Hosts       []string      `yaml:"hosts"`
+	Interval    time.Duration `yaml:"interval,omitempty"`
+	Network     string        `yaml:"network,omitempty"`
+	Protocol    string        `yaml:"protocol,omitempty"`
+	Size        int           `yaml:"size,omitempty"`
+	Source      string        `yaml:"source,omitempty"`
+	ToS         uint8         `yaml:"tos,omitempty"`
+	DNSResolve  bool          `yaml:"dns_resolve,omitempty"`  // Enable DNS TTL-aware resolution
+	DNSInterval time.Duration `yaml:"dns_interval,omitempty"` // Override DNS re-resolution interval (ignores TTL)
 	// TODO: Needs work to fix MetricFamily consistency.
 	// Labels   map[string]string `yaml:"labels,omitempty"`
 }
