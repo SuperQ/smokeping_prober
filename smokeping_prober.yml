@@ -8,3 +8,14 @@ targets:
   size: 56 # Packet data size in bytes. Default 56 (Range: 24 - 65535)
   source: 127.0.1.1 # Souce IP address to use. Default: None (automatic selection)
   tos: 0x00 # Packet ToS field in decimal, hexadecimal or binary format. Default: 0 (Range: 0-255)
+  dns_resolve: false # Enable TTL-aware DNS resolution. Default: false
+  # dns_interval: 5m # Override DNS re-resolution interval (ignores TTL). Default: use DNS TTL
+
+# Example with DNS TTL-aware resolution enabled
+- hosts:
+  - google.com
+  - cloudflare.com
+  interval: 1s
+  protocol: icmp
+  dns_resolve: true # This will re-resolve DNS based on TTL
+  # dns_interval: 10m # Uncomment to override TTL with fixed 10-minute interval

@@ -83,6 +83,7 @@ type smokePingers struct {
 	prepared    []*probing.Pinger
 	g           *errgroup.Group
 	maxInterval time.Duration
+	resolver    *TTLAwareDNSResolver
 }
 
 func (s *smokePingers) sizeOfPrepared() int {
@@ -122,6 +123,9 @@ func (s *smokePingers) stop() error {
 	}
 	for _, pinger := range s.started {
 		pinger.Stop()
+	}
+	if s.resolver != nil {
+		s.resolver.Stop()
 	}
 	if err := s.g.Wait(); err != nil {
 		return fmt.Errorf("pingers failed: %v", err)
@@ -163,20 +167,16 @@ func (s *smokePingers) prepare(hosts *[]string, interval *time.Duration, privile
 		if targetGroup.Interval > maxInterval {
 			maxInterval = targetGroup.Interval
 		}
+
+		// Initialize DNS resolver if needed
+		if targetGroup.DNSResolve && s.resolver == nil {
+			s.resolver = NewTTLAwareDNSResolver(targetGroup.DNSInterval)
+		}
+
 		for _, host = range targetGroup.Hosts {
-			pinger = probing.New(host)
-			pinger.Interval = targetGroup.Interval
-			pinger.RecordRtts = false
-			pinger.SetNetwork(targetGroup.Network)
-			pinger.Size = packetSize
-			pinger.SetTrafficClass(targetGroup.ToS)
-			pinger.Source = targetGroup.Source
-			if targetGroup.Protocol == "icmp" {
-				pinger.SetPrivileged(true)
-			}
-			err := pinger.Resolve()
+			pinger, err := s.createPinger(host, &targetGroup)
 			if err != nil {
-				return fmt.Errorf("failed to resolve pinger: %v", err)
+				return fmt.Errorf("failed to create pinger for %s: %v", host, err)
 			}
 			pingers = append(pingers, pinger)
 		}
@@ -184,6 +184,142 @@ func (s *smokePingers) prepare(hosts *[]string, interval *time.Duration, privile
 	s.prepared = pingers
 	s.maxInterval = maxInterval
 	return nil
+}
+
+// createPinger creates a pinger with optional DNS resolution
+func (s *smokePingers) createPinger(host string, targetGroup *config.TargetGroup) (*probing.Pinger, error) {
+	pinger := probing.New(host)
+	pinger.Interval = targetGroup.Interval
+	pinger.RecordRtts = false
+	pinger.SetNetwork(targetGroup.Network)
+	pinger.Size = targetGroup.Size
+	pinger.SetTrafficClass(targetGroup.ToS)
+	pinger.Source = targetGroup.Source
+	if targetGroup.Protocol == "icmp" {
+		pinger.SetPrivileged(true)
+	}
+
+	if targetGroup.DNSResolve && s.resolver != nil {
+		// Use TTL-aware DNS resolution
+		ip, err := s.resolver.Resolve(host)
+		if err != nil {
+			return nil, fmt.Errorf("DNS resolution failed: %w", err)
+		}
+
+		// Set the resolved IP directly
+		pinger.SetAddr(ip.String())
+		logger.Info("Pinger resolved with TTL-aware DNS", "host", host, "ip_addr", ip)
+	} else {
+		// Use standard resolution
+		err := pinger.Resolve()
+		if err != nil {
+			return nil, fmt.Errorf("standard resolution failed: %w", err)
+		}
+		logger.Info("Pinger resolved with standard DNS", "host", host, "ip_addr", pinger.IPAddr())
+	}
+
+	return pinger, nil
+}
+
+// startDNSReresolution starts a background goroutine to periodically re-resolve DNS
+func (s *smokePingers) startDNSReresolution(smokepingCollector *SmokepingCollector, pingResponseSeconds *prometheus.HistogramVec) {
+	if s.resolver == nil {
+		return
+	}
+
+	s.g.Go(func() error {
+		ticker := time.NewTicker(30 * time.Second) // Check every 30 seconds
+		defer ticker.Stop()
+
+		for range ticker.C {
+			s.checkAndUpdateDNS(smokepingCollector, pingResponseSeconds)
+		}
+		return nil
+	})
+}
+
+// checkAndUpdateDNS checks for expired DNS entries and updates pingers if needed
+func (s *smokePingers) checkAndUpdateDNS(smokepingCollector *SmokepingCollector, pingResponseSeconds *prometheus.HistogramVec) {
+	if s.resolver == nil || s.started == nil {
+		return
+	}
+
+	sc.RLock()
+	targetGroups := make([]config.TargetGroup, len(sc.C.Targets))
+	copy(targetGroups, sc.C.Targets)
+	sc.RUnlock()
+
+	needsRestart := false
+	newPingers := make([]*probing.Pinger, 0, len(s.started))
+
+	for _, pinger := range s.started {
+		hostname := pinger.Addr()
+		updated := false
+
+		// Check if this pinger uses DNS resolution
+		for _, targetGroup := range targetGroups {
+			if !targetGroup.DNSResolve {
+				continue
+			}
+
+			for _, host := range targetGroup.Hosts {
+				if host == hostname {
+					// Check if DNS entry has expired and needs re-resolution
+					if ip, err := s.resolver.Resolve(hostname); err == nil {
+						currentIP := pinger.IPAddr().IP
+						if !ip.Equal(currentIP) {
+							logger.Info("DNS IP changed, updating pinger",
+								"hostname", hostname,
+								"old_ip", currentIP,
+								"new_ip", ip)
+
+							// Create new pinger with updated IP
+							newPinger, err := s.createPinger(hostname, &targetGroup)
+							if err != nil {
+								logger.Error("Failed to create updated pinger", "hostname", hostname, "error", err)
+								newPingers = append(newPingers, pinger) // Keep old pinger
+							} else {
+								newPingers = append(newPingers, newPinger)
+								needsRestart = true
+								updated = true
+							}
+						}
+					}
+					break
+				}
+			}
+			if updated {
+				break
+			}
+		}
+
+		if !updated {
+			newPingers = append(newPingers, pinger)
+		}
+	}
+
+	if needsRestart {
+		logger.Info("Restarting pingers due to DNS changes")
+
+		// Stop current pingers
+		for _, pinger := range s.started {
+			pinger.Stop()
+		}
+
+		// Update started pingers
+		s.started = newPingers
+
+		// Restart pingers with splay
+		splay := time.Duration(s.maxInterval.Nanoseconds() / int64(len(s.started)))
+		for _, pinger := range s.started {
+			logger.Debug("Restarting pinger", "address", pinger.Addr(), "ip", pinger.IPAddr())
+			s.g.Go(pinger.Run)
+			time.Sleep(splay)
+		}
+
+		// Update collector
+		smokepingCollector.updatePingers(s.started, *pingResponseSeconds)
+	}
 }
 
 func parseBuckets(buckets string) ([]float64, error) {
@@ -275,6 +411,9 @@ func main() {
 	smokepingCollector = NewSmokepingCollector(smokePingers.started, *pingResponseSeconds)
 	prometheus.MustRegister(smokepingCollector)
 
+	// Start DNS re-resolution if enabled
+	smokePingers.startDNSReresolution(smokepingCollector, pingResponseSeconds)
+
 	hup := make(chan os.Signal, 1)
 	signal.Notify(hup, syscall.SIGHUP)
 	reloadCh := make(chan chan error)
@@ -313,6 +452,9 @@ func main() {
 
 			smokePingers.start()
 			smokepingCollector.updatePingers(smokePingers.started, *pingResponseSeconds)
+
+			// Restart DNS re-resolution if enabled
+			smokePingers.startDNSReresolution(smokepingCollector, pingResponseSeconds)
 
 			logger.Info("Reloaded config file")
 			successCallback()

@@ -55,9 +55,23 @@ targets:
   protocol: icmp # One of icmp, udp. Default: icmp (Requires privileged operation)
   size: 56 # Packet data size in bytes. Default 56 (Range: 24 - 65535)
   source: 127.0.1.1 # Souce IP address to use. Default: None (automatic selection)
+  dns_resolve: true # Enable TTL-aware DNS resolution. Default: false
+  dns_interval: 5m # Override DNS re-resolution interval (ignores TTL). Optional
 ```
 
-In each host group the `interval`, `network`, and `protocol` are optional.
+In each host group the `interval`, `network`, `protocol`, `dns_resolve`, and `dns_interval` are optional.
+
+### DNS TTL-Aware Resolution
+
+The smokeping_prober supports DNS TTL-aware resolution, which automatically re-resolves hostnames when their DNS TTL expires. This is useful for monitoring services that may change IP addresses over time.
+
+When `dns_resolve: true` is set in a target group:
+- The prober will query DNS servers directly to get TTL information
+- Hostnames will be automatically re-resolved when their TTL expires
+- If the IP address changes, the pinger will be updated automatically
+- DNS resolution metrics are exposed for monitoring
+
+Optional `dns_interval` can be used to override TTL-based timing with a fixed interval.
 
 The interval Duration is in [Go time.ParseDuration()](https://golang.org/pkg/time/#ParseDuration) syntax.
 
@@ -94,14 +108,17 @@ docker run \
 
 ## Metrics
 
- Metric Name                            | Type       | Description
-----------------------------------------|------------|-------------------------------------------
- smokeping\_requests\_total             | Counter    | Counter of pings sent.
- smokeping\_response\_duration\_seconds | Histogram  | Ping response duration.
- smokeping\_response\_ttl               | Gauge      | The last response Time To Live (TTL).
- smokeping\_response\_duplicates\_total | Counter    | The number of duplicated response packets.
- smokeping\_receive\_errors\_total      | Counter    | The number of errors when Pinger attempts to receive packets.
- smokeping\_send\_errors\_total         | Counter    | The number of errors when Pinger attempts to send packets.
+ Metric Name                                      | Type       | Description
+--------------------------------------------------|------------|-------------------------------------------
+ smokeping\_requests\_total                       | Counter    | Counter of pings sent.
+ smokeping\_response\_duration\_seconds           | Histogram  | Ping response duration.
+ smokeping\_response\_ttl                         | Gauge      | The last response Time To Live (TTL).
+ smokeping\_response\_duplicates\_total           | Counter    | The number of duplicated response packets.
+ smokeping\_receive\_errors\_total                | Counter    | The number of errors when Pinger attempts to receive packets.
+ smokeping\_send\_errors\_total                   | Counter    | The number of errors when Pinger attempts to send packets.
+ smokeping\_prober\_dns\_resolve\_total           | Counter    | Total number of DNS resolutions attempted.
+ smokeping\_prober\_dns\_resolve\_duration\_seconds | Histogram  | Time spent on DNS resolution.
+ smokeping\_prober\_dns\_cache\_entries           | Gauge      | Number of entries in the DNS cache.
 
 ### TLS and basic authentication
 
