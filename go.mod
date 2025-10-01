@@ -1,6 +1,6 @@
 module github.com/superq/smokeping_prober
 
-go 1.23.0
+go 1.24.0
 
 toolchain go1.24.1
 
@@ -11,7 +11,7 @@ require (
 	github.com/prometheus/common v0.63.0
 	github.com/prometheus/exporter-toolkit v0.13.2
 	go.uber.org/automaxprocs v1.6.0
-	golang.org/x/sync v0.13.0
+	golang.org/x/sync v0.17.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
