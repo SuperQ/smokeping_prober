@@ -145,6 +145,7 @@ func (s *smokePingers) prepare(hosts *[]string, interval *time.Duration, privile
 
 		pinger.Interval = *interval
 		pinger.RecordRtts = false
+		pinger.RecordTTLs = false
 		pinger.SetPrivileged(*privileged)
 		pinger.Size = *sizeBytes
 		pinger.SetTrafficClass(*tosField)
@@ -167,6 +168,7 @@ func (s *smokePingers) prepare(hosts *[]string, interval *time.Duration, privile
 			pinger = probing.New(host)
 			pinger.Interval = targetGroup.Interval
 			pinger.RecordRtts = false
+			pinger.RecordTTLs = false
 			pinger.SetNetwork(targetGroup.Network)
 			pinger.Size = packetSize
 			pinger.SetTrafficClass(targetGroup.ToS)
