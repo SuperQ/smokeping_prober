@@ -88,16 +88,18 @@ func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
 	return nil
 }
 
+// TargetGroup supports both the original list of hosts and the new single host format.
+// If `host` is set, it is folded into `hosts`.
 type TargetGroup struct {
-	Hosts    []string      `yaml:"hosts"`
-	Interval time.Duration `yaml:"interval,omitempty"`
-	Network  string        `yaml:"network,omitempty"`
-	Protocol string        `yaml:"protocol,omitempty"`
-	Size     int           `yaml:"size,omitempty"`
-	Source   string        `yaml:"source,omitempty"`
-	ToS      uint8         `yaml:"tos,omitempty"`
-	// TODO: Needs work to fix MetricFamily consistency.
-	// Labels   map[string]string `yaml:"labels,omitempty"`
+	Hosts    []string          `yaml:"hosts"`
+	Host     string            `yaml:"host,omitempty"`
+	Interval time.Duration     `yaml:"interval,omitempty"`
+	Network  string            `yaml:"network,omitempty"`
+	Protocol string            `yaml:"protocol,omitempty"`
+	Size     int               `yaml:"size,omitempty"`
+	Source   string            `yaml:"source,omitempty"`
+	ToS      uint8             `yaml:"tos,omitempty"`
+	Labels   map[string]string `yaml:"labels,omitempty"`
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
@@ -110,5 +112,12 @@ func (s *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
 func (s *TargetGroup) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	*s = DefaultTargetGroup
 	type plain TargetGroup
-	return unmarshal((*plain)(s))
+	if err := unmarshal((*plain)(s)); err != nil {
+		return err
+	}
+	// Fold single host into hosts list for backwards compatibility
+	if s.Host != "" && len(s.Hosts) == 0 {
+		s.Hosts = []string{s.Host}
+	}
+	return nil
 }

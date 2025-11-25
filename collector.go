@@ -21,7 +21,6 @@ import (
 	probing "github.com/prometheus-community/pro-bing"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 const (
@@ -31,7 +30,33 @@ const (
 var (
 	labelNames = []string{"ip", "host", "source", "tos"}
 
-	pingResponseTTL = promauto.NewGaugeVec(
+	pingResponseTTL        *prometheus.GaugeVec
+	pingResponseDuplicates *prometheus.CounterVec
+	pingRecvErrors         prometheus.Counter
+	pingSendErrors         *prometheus.CounterVec
+
+	labelsByPinger map[*probing.Pinger]map[string]string
+)
+
+// initializes (or re-initializes) the metric vectors with the provided label set.
+func InitMetrics(newLabelNames []string, buckets []float64, factor float64) *prometheus.HistogramVec {
+
+	if pingResponseTTL != nil {
+		prometheus.Unregister(pingResponseTTL)
+	}
+	if pingResponseDuplicates != nil {
+		prometheus.Unregister(pingResponseDuplicates)
+	}
+	if pingRecvErrors != nil {
+		prometheus.Unregister(pingRecvErrors)
+	}
+	if pingSendErrors != nil {
+		prometheus.Unregister(pingSendErrors)
+	}
+
+	labelNames = newLabelNames
+
+	pingResponseTTL = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "response_ttl",
@@ -39,7 +64,7 @@ var (
 		},
 		labelNames,
 	)
-	pingResponseDuplicates = promauto.NewCounterVec(
+	pingResponseDuplicates = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "response_duplicates_total",
@@ -47,14 +72,14 @@ var (
 		},
 		labelNames,
 	)
-	pingRecvErrors = promauto.NewCounter(
+	pingRecvErrors = prometheus.NewCounter(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "receive_errors_total",
 			Help:      "The number of errors when Pinger attempts to receive packets.",
 		},
 	)
-	pingSendErrors = promauto.NewCounterVec(
+	pingSendErrors = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Name:      "send_errors_total",
@@ -62,9 +87,12 @@ var (
 		},
 		labelNames,
 	)
-)
 
-func newPingResponseHistogram(buckets []float64, factor float64) *prometheus.HistogramVec {
+	prometheus.MustRegister(pingResponseTTL)
+	prometheus.MustRegister(pingResponseDuplicates)
+	prometheus.MustRegister(pingRecvErrors)
+	prometheus.MustRegister(pingSendErrors)
+
 	return prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace:                   namespace,
@@ -75,6 +103,13 @@ func newPingResponseHistogram(buckets []float64, factor float64) *prometheus.His
 		},
 		labelNames,
 	)
+}
+
+func SetLabelsForPinger(p *probing.Pinger, labels map[string]string) {
+	if labelsByPinger == nil {
+		labelsByPinger = make(map[*probing.Pinger]map[string]string)
+	}
+	labelsByPinger[p] = labels
 }
 
 // SmokepingCollector collects metrics from the pinger.
@@ -100,6 +135,33 @@ func NewSmokepingCollector(pingers []*probing.Pinger, pingResponseSeconds promet
 	return &instance
 }
 
+func buildLabelValues(pinger *probing.Pinger, overrideIP string) []string {
+	vals := make([]string, 0, len(labelNames))
+	base := map[string]string{
+		"ip":     pinger.IPAddr().String(),
+		"host":   pinger.Addr(),
+		"source": pinger.Source,
+		"tos":    strconv.Itoa(int(pinger.TrafficClass())),
+	}
+	labels := labelsByPinger[pinger]
+	for _, k := range labelNames {
+		if v, ok := base[k]; ok {
+			vals = append(vals, v)
+			continue
+		}
+		vals = append(vals, labels[k])
+	}
+	if overrideIP != "" {
+		for i, k := range labelNames {
+			if k == "ip" {
+				vals[i] = overrideIP
+				break
+			}
+		}
+	}
+	return vals
+}
+
 func (s *SmokepingCollector) updatePingers(pingers []*probing.Pinger, pingResponseSeconds prometheus.HistogramVec) {
 	pingResponseDuplicates.Reset()
 	pingResponseSeconds.Reset()
@@ -107,34 +169,35 @@ func (s *SmokepingCollector) updatePingers(pingers []*probing.Pinger, pingRespon
 	pingSendErrors.Reset()
 	for _, pinger := range pingers {
 		// Init all metrics to 0s.
-		ipAddr := pinger.IPAddr().String()
-		host := pinger.Addr()
-		source := pinger.Source
-		tos := strconv.Itoa(int(pinger.TrafficClass()))
-		pingResponseDuplicates.WithLabelValues(ipAddr, host, source, tos)
-		pingResponseSeconds.WithLabelValues(ipAddr, host, source, tos)
-		pingResponseTTL.WithLabelValues(ipAddr, host, source, tos)
-		pingSendErrors.WithLabelValues(ipAddr, host, source, tos)
+		vals := buildLabelValues(pinger, "")
+		pingResponseDuplicates.WithLabelValues(vals...)
+		pingResponseSeconds.WithLabelValues(vals...)
+		pingResponseTTL.WithLabelValues(vals...)
+		pingSendErrors.WithLabelValues(vals...)
+
+		p := pinger
 
 		// Setup handler functions.
-		pinger.OnRecv = func(pkt *probing.Packet) {
-			pingResponseSeconds.WithLabelValues(pkt.IPAddr.String(), host, source, tos).Observe(pkt.Rtt.Seconds())
-			pingResponseTTL.WithLabelValues(pkt.IPAddr.String(), host, source, tos).Set(float64(pkt.TTL))
+		p.OnRecv = func(pkt *probing.Packet) {
+			vals := buildLabelValues(p, pkt.IPAddr.String())
+			pingResponseSeconds.WithLabelValues(vals...).Observe(pkt.Rtt.Seconds())
+			pingResponseTTL.WithLabelValues(vals...).Set(float64(pkt.TTL))
 			logger.Debug("Echo reply", "ip_addr", pkt.IPAddr,
-				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "rtt", pkt.Rtt, "ttl", pkt.TTL, "tos", tos)
+				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "rtt", pkt.Rtt, "ttl", pkt.TTL)
 		}
-		pinger.OnDuplicateRecv = func(pkt *probing.Packet) {
-			pingResponseDuplicates.WithLabelValues(pkt.IPAddr.String(), host, source, tos).Inc()
+		p.OnDuplicateRecv = func(pkt *probing.Packet) {
+			vals := buildLabelValues(p, pkt.IPAddr.String())
+			pingResponseDuplicates.WithLabelValues(vals...).Inc()
 			logger.Debug("Echo reply (DUP!)", "ip_addr", pkt.IPAddr,
-				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "rtt", pkt.Rtt, "ttl", pkt.TTL, "tos", tos)
+				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "rtt", pkt.Rtt, "ttl", pkt.TTL)
 		}
-		pinger.OnFinish = func(stats *probing.Statistics) {
+		p.OnFinish = func(stats *probing.Statistics) {
 			logger.Debug("Ping statistics", "addr", stats.Addr,
 				"packets_sent", stats.PacketsSent, "packets_received", stats.PacketsRecv,
 				"packet_loss_percent", stats.PacketLoss, "min_rtt", stats.MinRtt, "avg_rtt",
 				stats.AvgRtt, "max_rtt", stats.MaxRtt, "stddev_rtt", stats.StdDevRtt)
 		}
-		pinger.OnRecvError = func(err error) {
+		p.OnRecvError = func(err error) {
 			if neterr, ok := err.(*net.OpError); ok {
 				if neterr.Timeout() {
 					// Ignore read timeout errors, these are handled by the pinger.
@@ -145,10 +208,11 @@ func (s *SmokepingCollector) updatePingers(pingers []*probing.Pinger, pingRespon
 			// TODO: @tjhop -- should this be logged at error level?
 			logger.Debug("Error receiving packet", "error", err)
 		}
-		pinger.OnSendError = func(pkt *probing.Packet, err error) {
-			pingSendErrors.WithLabelValues(pkt.IPAddr.String(), host, source, tos).Inc()
+		p.OnSendError = func(pkt *probing.Packet, err error) {
+			vals := buildLabelValues(p, pkt.IPAddr.String())
+			pingSendErrors.WithLabelValues(vals...).Inc()
 			logger.Debug("Error sending packet", "ip_addr", pkt.IPAddr,
-				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "rtt", pkt.Rtt, "ttl", pkt.TTL, "tos", tos, "error", err)
+				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "rtt", pkt.Rtt, "ttl", pkt.TTL, "error", err)
 		}
 	}
 	s.pingers = &pingers
@@ -161,15 +225,12 @@ func (s *SmokepingCollector) Describe(ch chan<- *prometheus.Desc) {
 func (s *SmokepingCollector) Collect(ch chan<- prometheus.Metric) {
 	for _, pinger := range *s.pingers {
 		stats := pinger.Statistics()
-
+		vals := buildLabelValues(pinger, stats.IPAddr.String())
 		ch <- prometheus.MustNewConstMetric(
 			s.requestsSent,
 			prometheus.CounterValue,
 			float64(stats.PacketsSent),
-			stats.IPAddr.String(),
-			stats.Addr,
-			pinger.Source,
-			strconv.Itoa(int(pinger.TrafficClass())),
+			vals...,
 		)
 	}
 }

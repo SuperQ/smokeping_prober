@@ -22,6 +22,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -150,6 +151,8 @@ func (s *smokePingers) prepare(hosts *[]string, interval *time.Duration, privile
 		pinger.SetTrafficClass(*tosField)
 
 		pingers[i] = pinger
+		// set empty labels for CLI defined hosts
+		SetLabelsForPinger(pinger, map[string]string{})
 	}
 
 	maxInterval := *interval
@@ -179,6 +182,7 @@ func (s *smokePingers) prepare(hosts *[]string, interval *time.Duration, privile
 				return fmt.Errorf("failed to resolve pinger: %v", err)
 			}
 			pingers = append(pingers, pinger)
+			SetLabelsForPinger(pinger, targetGroup.Labels)
 		}
 	}
 	s.prepared = pingers
@@ -203,6 +207,27 @@ func init() {
 	prometheus.MustRegister(versioncollector.NewCollector("smokeping_prober"))
 }
 
+func buildLabelNamesFromConfig() []string {
+	base := []string{"ip", "host", "source", "tos"}
+	m := map[string]struct{}{}
+	sc.RLock()
+	defer sc.RUnlock()
+	for _, tg := range sc.C.Targets {
+		for k := range tg.Labels {
+			if k == "ip" || k == "host" || k == "source" || k == "tos" {
+				continue
+			}
+			m[k] = struct{}{}
+		}
+	}
+	extras := make([]string, 0, len(m))
+	for k := range m {
+		extras = append(extras, k)
+	}
+	slices.Sort(extras)
+	return append(base, extras...)
+}
+
 func main() {
 	var (
 		configFile  = kingpin.Flag("config.file", "Optional smokeping_prober configuration yaml file.").String()
@@ -220,6 +245,7 @@ func main() {
 
 	var smokePingers smokePingers
 	var smokepingCollector *SmokepingCollector
+	var pingResponseSeconds *prometheus.HistogramVec
 
 	promslogConfig := &promslog.Config{}
 	flag.AddFlags(kingpin.CommandLine, promslogConfig)
@@ -257,7 +283,9 @@ func main() {
 		logger.Error("Failed to parse buckets", "err", err)
 		os.Exit(1)
 	}
-	pingResponseSeconds := newPingResponseHistogram(bucketlist, *factor)
+
+	labelNames := buildLabelNamesFromConfig()
+	pingResponseSeconds = InitMetrics(labelNames, bucketlist, *factor)
 	prometheus.MustRegister(pingResponseSeconds)
 
 	err = smokePingers.prepare(hosts, interval, privileged, sizeBytes, tosField)
@@ -299,6 +327,13 @@ func main() {
 				errCallback(err)
 				continue
 			}
+
+			// Re-init metrics with possibly updated label keys
+			newLabelNames := buildLabelNamesFromConfig()
+			prometheus.Unregister(pingResponseSeconds)
+			pingResponseSeconds = InitMetrics(newLabelNames, bucketlist, *factor)
+			prometheus.MustRegister(pingResponseSeconds)
+
 			err = smokePingers.prepare(hosts, interval, privileged, sizeBytes, tosField)
 			if err != nil {
 				logger.Error("Unable to create ping from config", "err", err)
