@@ -79,9 +79,14 @@ func HostList(s kingpin.Settings) (target *[]string) {
 	return
 }
 
+type probe struct {
+	pinger *probing.Pinger
+	labels prometheus.Labels
+}
+
 type smokePingers struct {
-	started     []*probing.Pinger
-	prepared    []*probing.Pinger
+	started     []probe
+	prepared    []probe
 	g           *errgroup.Group
 	maxInterval time.Duration
 }
@@ -106,7 +111,8 @@ func (s *smokePingers) start() {
 	s.g = new(errgroup.Group)
 	s.started = s.prepared
 	splay := time.Duration(s.maxInterval.Nanoseconds() / int64(len(s.started)))
-	for _, pinger := range s.started {
+	for _, pr := range s.started {
+		pinger := pr.pinger
 		logger.Info("Starting prober", "address", pinger.Addr(), "interval", pinger.Interval, "size_bytes", pinger.Size, "source_address", pinger.Source)
 		s.g.Go(pinger.Run)
 		time.Sleep(splay)
@@ -121,8 +127,8 @@ func (s *smokePingers) stop() error {
 	if s.started == nil {
 		return nil
 	}
-	for _, pinger := range s.started {
-		pinger.Stop()
+	for _, pr := range s.started {
+		pr.pinger.Stop()
 	}
 	if err := s.g.Wait(); err != nil {
 		return fmt.Errorf("pingers failed: %v", err)
@@ -131,10 +137,10 @@ func (s *smokePingers) stop() error {
 }
 
 func (s *smokePingers) prepare(hosts *[]string, interval *time.Duration, privileged *bool, sizeBytes *int, tosField *uint8) error {
-	pingers := make([]*probing.Pinger, len(*hosts))
+	probes := make([]probe, 0, len(*hosts))
 	var pinger *probing.Pinger
 	var host string
-	for i, host := range *hosts {
+	for _, host = range *hosts {
 		pinger = probing.New(host)
 
 		err := pinger.Resolve()
@@ -146,13 +152,15 @@ func (s *smokePingers) prepare(hosts *[]string, interval *time.Duration, privile
 
 		pinger.Interval = *interval
 		pinger.RecordRtts = false
+		pinger.RecordTTLs = false
 		pinger.SetPrivileged(*privileged)
 		pinger.Size = *sizeBytes
 		pinger.SetTrafficClass(*tosField)
 
-		pingers[i] = pinger
-		// set empty labels for CLI defined hosts
-		SetLabelsForPinger(pinger, map[string]string{})
+		probes = append(probes, probe{
+			pinger: pinger,
+			labels: map[string]string{},
+		})
 	}
 
 	maxInterval := *interval
@@ -170,6 +178,7 @@ func (s *smokePingers) prepare(hosts *[]string, interval *time.Duration, privile
 			pinger = probing.New(host)
 			pinger.Interval = targetGroup.Interval
 			pinger.RecordRtts = false
+			pinger.RecordTTLs = false
 			pinger.SetNetwork(targetGroup.Network)
 			pinger.Size = packetSize
 			pinger.SetTrafficClass(targetGroup.ToS)
@@ -181,11 +190,13 @@ func (s *smokePingers) prepare(hosts *[]string, interval *time.Duration, privile
 			if err != nil {
 				return fmt.Errorf("failed to resolve pinger: %v", err)
 			}
-			pingers = append(pingers, pinger)
-			SetLabelsForPinger(pinger, targetGroup.Labels)
+			probes = append(probes, probe{
+				pinger: pinger,
+				labels: targetGroup.Labels,
+			})
 		}
 	}
-	s.prepared = pingers
+	s.prepared = probes
 	s.maxInterval = maxInterval
 	return nil
 }
@@ -285,7 +296,7 @@ func main() {
 	}
 
 	labelNames := buildLabelNamesFromConfig()
-	pingResponseSeconds = InitMetrics(labelNames, bucketlist, *factor)
+	pingResponseSeconds = initMetrics(labelNames, bucketlist, *factor)
 	prometheus.MustRegister(pingResponseSeconds)
 
 	err = smokePingers.prepare(hosts, interval, privileged, sizeBytes, tosField)
@@ -300,7 +311,7 @@ func main() {
 	}
 
 	smokePingers.start()
-	smokepingCollector = NewSmokepingCollector(smokePingers.started, *pingResponseSeconds)
+	smokepingCollector = NewSmokepingCollector(smokePingers.started, labelNames, *pingResponseSeconds)
 	prometheus.MustRegister(smokepingCollector)
 
 	hup := make(chan os.Signal, 1)
@@ -328,10 +339,10 @@ func main() {
 				continue
 			}
 
-			// Re-init metrics with possibly updated label keys
+			// Re-init metrics and collector with possibly updated label keys
 			newLabelNames := buildLabelNamesFromConfig()
 			prometheus.Unregister(pingResponseSeconds)
-			pingResponseSeconds = InitMetrics(newLabelNames, bucketlist, *factor)
+			pingResponseSeconds = initMetrics(newLabelNames, bucketlist, *factor)
 			prometheus.MustRegister(pingResponseSeconds)
 
 			err = smokePingers.prepare(hosts, interval, privileged, sizeBytes, tosField)
@@ -347,7 +358,11 @@ func main() {
 			}
 
 			smokePingers.start()
-			smokepingCollector.updatePingers(smokePingers.started, *pingResponseSeconds)
+
+			// Recreate collector to reflect any label set changes
+			prometheus.Unregister(smokepingCollector)
+			smokepingCollector = NewSmokepingCollector(smokePingers.started, newLabelNames, *pingResponseSeconds)
+			prometheus.MustRegister(smokepingCollector)
 
 			logger.Info("Reloaded config file")
 			successCallback()
@@ -403,5 +418,4 @@ func main() {
 	if err != nil {
 		logger.Error("Failed to run smoke pingers", "err", err)
 	}
-
 }
