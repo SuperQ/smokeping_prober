@@ -20,10 +20,9 @@ import (
 	"sync"
 	"time"
 
-	yaml "gopkg.in/yaml.v2"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	yaml "gopkg.in/yaml.v2"
 )
 
 const namespace = "smokeping_prober"
@@ -60,7 +59,7 @@ type SafeConfig struct {
 }
 
 func (sc *SafeConfig) ReloadConfig(confFile string) (err error) {
-	var c = &Config{}
+	c := &Config{}
 	defer func() {
 		if err != nil {
 			configReloadSuccess.Set(0)

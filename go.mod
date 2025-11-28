@@ -1,8 +1,6 @@
-module github.com/superq/smokeping_prober
+module github.com/SuperQ/smokeping_prober
 
 go 1.24.0
-
-toolchain go1.24.1
 
 require (
 	github.com/alecthomas/kingpin/v2 v2.4.0
