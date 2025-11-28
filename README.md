@@ -68,7 +68,7 @@ The config is read on startup, and can be reloaded with the SIGHUP signal, or wi
 Requires Go >= 1.22
 
 ```console
-go install github.com/superq/smokeping_prober@latest
+go install github.com/SuperQ/smokeping_prober@latest
 sudo setcap cap_net_raw=+ep ${GOPATH}/bin/smokeping_prober
 ```
 

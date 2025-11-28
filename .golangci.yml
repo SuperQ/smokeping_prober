@@ -8,11 +8,6 @@ linters:
     errcheck:
       exclude-functions:
         - (net/http.ResponseWriter).Write
-    revive:
-      rules:
-        - name: unused-parameter
-          severity: warning
-          disabled: true
   exclusions:
     generated: lax
     presets:
@@ -24,14 +19,19 @@ linters:
       - linters:
           - errcheck
         path: _test.go
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
 formatters:
-  exclusions:
-    generated: lax
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
+  enable:
+    - gci
+    - gofumpt
+    - goimports
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/SuperQ/smokeping_prober)
+    gofumpt:
+      extra-rules: true
+    goimports:
+      local-prefixes:
+        - github.com/SuperQ/smokeping_prober

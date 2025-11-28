@@ -19,7 +19,6 @@ import (
 	"strconv"
 
 	probing "github.com/prometheus-community/pro-bing"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -37,7 +36,6 @@ var (
 
 // initMetrics initializes (or re-initializes) the metric vectors with the provided label set.
 func initMetrics(labelNames []string, buckets []float64, factor float64) *prometheus.HistogramVec {
-
 	if pingResponseTTL != nil {
 		prometheus.Unregister(pingResponseTTL)
 	}
@@ -104,7 +102,6 @@ type SmokepingCollector struct {
 }
 
 func NewSmokepingCollector(probes []probe, labelNames []string, pingResponseSeconds prometheus.HistogramVec) *SmokepingCollector {
-
 	instance := SmokepingCollector{
 		requestsSent: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "", "requests_total"),

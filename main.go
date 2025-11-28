@@ -28,10 +28,8 @@ import (
 	"syscall"
 	"time"
 
-	probing "github.com/prometheus-community/pro-bing"
-	"github.com/superq/smokeping_prober/config"
-
 	"github.com/alecthomas/kingpin/v2"
+	probing "github.com/prometheus-community/pro-bing"
 	"github.com/prometheus/client_golang/prometheus"
 	versioncollector "github.com/prometheus/client_golang/prometheus/collectors/version"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -42,6 +40,8 @@ import (
 	"github.com/prometheus/exporter-toolkit/web/kingpinflag"
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/SuperQ/smokeping_prober/config"
 )
 
 var (
@@ -76,7 +76,7 @@ func (h *hostList) IsCumulative() bool {
 func HostList(s kingpin.Settings) (target *[]string) {
 	target = new([]string)
 	s.SetValue((*hostList)(target))
-	return
+	return target
 }
 
 type probe struct {
@@ -323,7 +323,7 @@ func main() {
 			var successCallback func()
 			select {
 			case <-hup:
-				errCallback = func(e error) {}
+				errCallback = func(_ error) {}
 				successCallback = func() {}
 			case rc := <-reloadCh:
 				errCallback = func(e error) {
@@ -370,7 +370,7 @@ func main() {
 	}()
 
 	http.Handle(*metricsPath, promhttp.Handler())
-	http.HandleFunc("/-/healthy", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/-/healthy", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Healthy"))
 	})
