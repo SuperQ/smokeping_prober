@@ -1,0 +1,79 @@
+---
+name: CI
+on:
+  pull_request:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - master
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    # Whenever the Go version is updated here, .promu.yml
+    # should also be updated.
+    container:
+      image: quay.io/prometheus/golang-builder:1.26-base
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: prometheus/promci@fc721ff8497a70a93a881cd552b71af7fb3a9d53  # v0.5.4
+      - uses: ./.github/promci/actions/setup_environment
+      - run: make
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        thread: [ 0, 1, 2 ]
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: prometheus/promci@fc721ff8497a70a93a881cd552b71af7fb3a9d53  # v0.5.4
+      - uses: ./.github/promci/actions/build
+        with:
+          parallelism: 3
+          thread: ${{ matrix.thread }}
+
+  publish_master:
+    name: Publish master branch artifacts
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: |
+      (github.repository == 'superq/draytek_exporter')
+      &&
+      (github.event_name == 'push' && github.event.ref == 'refs/heads/master')
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: prometheus/promci@fc721ff8497a70a93a881cd552b71af7fb3a9d53  # v0.5.4
+      - uses: ./.github/promci/actions/publish_main
+        with:
+          docker_hub_organization: superque
+          docker_hub_login: ${{ secrets.docker_hub_login }}
+          docker_hub_password: ${{ secrets.docker_hub_password }}
+          quay_io_organization: superq
+          quay_io_login: ${{ secrets.quay_io_login }}
+          quay_io_password: ${{ secrets.quay_io_password }}
+
+  publish_release:
+    name: Publish release arfefacts
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    needs: [test, build]
+    if: |
+      (github.repository == 'superq/draytek_exporter')
+      &&
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: prometheus/promci@fc721ff8497a70a93a881cd552b71af7fb3a9d53  # v0.5.4
+      - uses: ./.github/promci/actions/publish_release
+        with:
+          docker_hub_organization: superque
+          docker_hub_login: ${{ secrets.docker_hub_login }}
+          docker_hub_password: ${{ secrets.docker_hub_password }}
+          quay_io_organization: superq
+          quay_io_login: ${{ secrets.quay_io_login }}
+          quay_io_password: ${{ secrets.quay_io_password }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
