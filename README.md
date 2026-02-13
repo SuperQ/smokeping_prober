@@ -1,6 +1,6 @@
 # smokeping_prober
 
-[![CircleCI](https://circleci.com/gh/SuperQ/smokeping_prober/tree/master.svg?style=svg)](https://circleci.com/gh/SuperQ/smokeping_prober/tree/master)
+[![Build Status](https://github.com/SuperQ/smokeping_prober/actions/workflows/ci.yml/badge.svg)](https://github.com/SuperQ/smokeping_prober/actions/workflows/ci.yml)
 [![Docker Repository on Quay](https://quay.io/repository/superq/smokeping-prober/status "Docker Repository on Quay")](https://quay.io/repository/superq/smokeping-prober)
 
 Prometheus style "smokeping" prober.
