@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test, build]
     if: |
-      (github.repository == 'superq/draytek_exporter')
+      (github.repository == 'superq/smokeping_prober')
       &&
       (github.event_name == 'push' && github.event.ref == 'refs/heads/master')
     steps:
@@ -62,7 +62,7 @@ jobs:
       contents: write
     needs: [test, build]
     if: |
-      (github.repository == 'superq/draytek_exporter')
+      (github.repository == 'superq/smokeping_prober')
       &&
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
     steps:
