@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -88,6 +89,8 @@ type smokePingers struct {
 	started     []probe
 	prepared    []probe
 	g           *errgroup.Group
+	ctx         context.Context
+	cancel      context.CancelFunc
 	maxInterval time.Duration
 }
 
@@ -108,13 +111,28 @@ func (s *smokePingers) start() {
 			logger.Warn("At least one previous pinger failed to run", "err", err)
 		}
 	}
-	s.g = new(errgroup.Group)
+	s.ctx, s.cancel = context.WithCancel(context.Background())
+	s.g, s.ctx = errgroup.WithContext(s.ctx)
 	s.started = s.prepared
 	splay := time.Duration(s.maxInterval.Nanoseconds() / int64(len(s.started)))
 	for _, pr := range s.started {
 		pinger := pr.pinger
 		logger.Info("Starting prober", "address", pinger.Addr(), "interval", pinger.Interval, "size_bytes", pinger.Size, "source_address", pinger.Source)
-		s.g.Go(pinger.Run)
+		s.g.Go(func() error {
+			for {
+				err := pinger.Run()
+				if err != nil {
+					logger.Error("Pinger exited with error", "address", pinger.Addr(), "err", err)
+				}
+				select {
+				case <-s.ctx.Done():
+					return nil
+				case <-time.After(time.Second):
+					// Restart after 1 second backoff.
+					logger.Info("Restarting pinger", "address", pinger.Addr())
+				}
+			}
+		})
 		time.Sleep(splay)
 	}
 	s.prepared = nil
@@ -127,10 +145,13 @@ func (s *smokePingers) stop() error {
 	if s.started == nil {
 		return nil
 	}
+	if s.cancel != nil {
+		s.cancel()
+	}
 	for _, pr := range s.started {
 		pr.pinger.Stop()
 	}
-	if err := s.g.Wait(); err != nil {
+	if err := s.g.Wait(); err != nil && !errors.Is(err, context.Canceled) {
 		return fmt.Errorf("pingers failed: %v", err)
 	}
 	return nil
@@ -145,7 +166,8 @@ func (s *smokePingers) prepare(hosts *[]string, interval *time.Duration, privile
 
 		err := pinger.Resolve()
 		if err != nil {
-			return fmt.Errorf("failed to resolve pinger: %v", err)
+			logger.Warn("Failed to resolve pinger, skipping", "host", host, "err", err)
+			continue
 		}
 
 		logger.Info("Pinger resolved", "host", host, "ip_addr", pinger.IPAddr())
@@ -188,7 +210,8 @@ func (s *smokePingers) prepare(hosts *[]string, interval *time.Duration, privile
 			}
 			err := pinger.Resolve()
 			if err != nil {
-				return fmt.Errorf("failed to resolve pinger: %v", err)
+				logger.Warn("Failed to resolve pinger, skipping", "host", host, "err", err)
+				continue
 			}
 			probes = append(probes, probe{
 				pinger: pinger,
