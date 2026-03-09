@@ -114,7 +114,20 @@ func (s *smokePingers) start() {
 	for _, pr := range s.started {
 		pinger := pr.pinger
 		logger.Info("Starting prober", "address", pinger.Addr(), "interval", pinger.Interval, "size_bytes", pinger.Size, "source_address", pinger.Source)
-		s.g.Go(pinger.Run)
+		s.g.Go(
+			func() error {
+				err := pinger.Run()
+				if err != nil {
+					logger.Warn("Pinger exited with error",
+						"address", pinger.Addr(),
+						"interval", pinger.Interval,
+						"size_bytes", pinger.Size,
+						"source_address", pinger.Source,
+						"err", err,
+					)
+				}
+				return err
+			})
 		time.Sleep(splay)
 	}
 	s.prepared = nil
