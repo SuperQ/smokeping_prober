@@ -5,6 +5,12 @@
 * [ENHANCEMENT]
 * [BUGFIX]
 
+## 0.11.0 / 2026-03-09
+
+* [FEATURE] Add custom label list per target #215
+* [ENHANCEMENT] Capture pinger errors #229
+* [BUGFIX] Disable TTL statistics to fix memory leak #197
+
 ## 0.10.0 / 2025-04-07
 
 * [FEATURE] Add traffic class setting #181
