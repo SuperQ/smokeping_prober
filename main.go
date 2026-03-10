@@ -32,6 +32,7 @@ import (
 	probing "github.com/prometheus-community/pro-bing"
 	"github.com/prometheus/client_golang/prometheus"
 	versioncollector "github.com/prometheus/client_golang/prometheus/collectors/version"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/promslog"
 	"github.com/prometheus/common/promslog/flag"
@@ -53,6 +54,14 @@ var (
 	sc = &config.SafeConfig{
 		C: &config.Config{},
 	}
+
+	proberErrors = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "prober_errors_total",
+			Help:      "The number of probers that returned an error.",
+		},
+	)
 )
 
 type hostList []string
@@ -118,6 +127,7 @@ func (s *smokePingers) start() {
 			func() error {
 				err := pinger.Run()
 				if err != nil {
+					proberErrors.Inc()
 					logger.Warn("Pinger exited with error",
 						"address", pinger.Addr(),
 						"interval", pinger.Interval,
