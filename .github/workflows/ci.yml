@@ -28,7 +28,7 @@ jobs:
         thread: [ 0, 1, 2 ]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: prometheus/promci/build@769ee18070cd21cfc2a24fa912349fd3e48dee58 # v0.6.0
+      - uses: prometheus/promci/build@9c86752f3395e08c57719af549cc455d8e2c2514 # v0.7.0
         with:
           parallelism: 3
           thread: ${{ matrix.thread }}
@@ -43,7 +43,7 @@ jobs:
       (github.event_name == 'push' && github.event.ref == 'refs/heads/master')
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: prometheus/promci/publish_main@769ee18070cd21cfc2a24fa912349fd3e48dee58 # v0.6.0
+      - uses: prometheus/promci/publish_main@9c86752f3395e08c57719af549cc455d8e2c2514 # v0.7.0
         with:
           docker_hub_organization: superque
           docker_hub_login: ${{ secrets.docker_hub_login }}
@@ -64,7 +64,7 @@ jobs:
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: prometheus/promci/publish_release@769ee18070cd21cfc2a24fa912349fd3e48dee58 # v0.6.0
+      - uses: prometheus/promci/publish_release@9c86752f3395e08c57719af549cc455d8e2c2514 # v0.7.0
         with:
           docker_hub_organization: superque
           docker_hub_login: ${{ secrets.docker_hub_login }}
