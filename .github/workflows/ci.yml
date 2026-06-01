@@ -3,73 +3,78 @@ name: CI
 on:
   pull_request:
   push:
-    tags:
-      - 'v*'
-    branches:
-      - master
+    branches: [main, master, 'release-*']
+    tags: ['v*']
+
+permissions:
+  contents: read
+
 jobs:
-  test:
-    name: Test
+  test_go:
+    name: Go tests
     runs-on: ubuntu-latest
-    # Whenever the Go version is updated here, .promu.yml
-    # should also be updated.
     container:
+      # Whenever the Go version is updated here, .promu.yml
+      # should also be updated.
       image: quay.io/prometheus/golang-builder:1.26-base
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
       - uses: prometheus/promci-setup@5af30ba8c199a91d6c04ebdc3c48e630e355f62d # v0.1.0
-      - run: make
+      - run: make GO_ONLY=1 SKIP_GOLANGCI_LINT=1
+      - run: git diff --exit-code
 
   build:
     name: Build
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        thread: [ 0, 1, 2 ]
+        thread: [ 0, 1, 2, 3]
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: prometheus/promci/build@769ee18070cd21cfc2a24fa912349fd3e48dee58 # v0.6.0
+      - uses: prometheus/promci/build@d9d4f5688814f0b77bf003d07fb8c00507390634 # v0.8.2
         with:
-          parallelism: 3
+          parallelism: 4
           thread: ${{ matrix.thread }}
 
-  publish_master:
-    name: Publish master branch artifacts
+  publish_default:
+    name: Publish default branch artifacts
     runs-on: ubuntu-latest
-    needs: [test, build]
+    permissions:
+      packages: write
+    needs: [test_go, build]
     if: |
-      (github.repository == 'superq/smokeping_prober')
-      &&
+      (github.event_name == 'push' && github.event.ref == 'refs/heads/main')
+      ||
       (github.event_name == 'push' && github.event.ref == 'refs/heads/master')
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: prometheus/promci/publish_main@769ee18070cd21cfc2a24fa912349fd3e48dee58 # v0.6.0
+      - uses: prometheus/promci/publish_main@d9d4f5688814f0b77bf003d07fb8c00507390634 # v0.8.2
         with:
           docker_hub_organization: superque
           docker_hub_login: ${{ secrets.docker_hub_login }}
           docker_hub_password: ${{ secrets.docker_hub_password }}
+          ghcr_io_password: ${{ github.token }}
           quay_io_organization: superq
           quay_io_login: ${{ secrets.quay_io_login }}
           quay_io_password: ${{ secrets.quay_io_password }}
 
   publish_release:
-    name: Publish release arfefacts
+    name: Publish release artefacts
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    needs: [test, build]
+      packages: write
+    needs: [test_go, build]
     if: |
-      (github.repository == 'superq/smokeping_prober')
-      &&
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: prometheus/promci/publish_release@769ee18070cd21cfc2a24fa912349fd3e48dee58 # v0.6.0
+      - uses: prometheus/promci/publish_release@d9d4f5688814f0b77bf003d07fb8c00507390634 # v0.8.2
         with:
           docker_hub_organization: superque
           docker_hub_login: ${{ secrets.docker_hub_login }}
           docker_hub_password: ${{ secrets.docker_hub_password }}
+          ghcr_io_password: ${{ github.token }}
           quay_io_organization: superq
-          quay_io_login: ${{ secrets.quay_io_login }}
           quay_io_password: ${{ secrets.quay_io_password }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          quay_io_login: ${{ secrets.quay_io_login }}
+          github_token: ${{ github.token }}
