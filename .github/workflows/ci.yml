@@ -32,7 +32,7 @@ jobs:
       matrix:
         thread: [ 0, 1, 2, 3]
     steps:
-      - uses: prometheus/promci/build@d9d4f5688814f0b77bf003d07fb8c00507390634 # v0.8.2
+      - uses: prometheus/promci/build@9c0e5048a10565e63cbf7c94527ba81ce9be0bea # v0.8.4
         with:
           parallelism: 4
           thread: ${{ matrix.thread }}
@@ -48,11 +48,13 @@ jobs:
       ||
       (github.event_name == 'push' && github.event.ref == 'refs/heads/master')
     steps:
-      - uses: prometheus/promci/publish_main@d9d4f5688814f0b77bf003d07fb8c00507390634 # v0.8.2
+      - uses: prometheus/promci/publish_main@9c0e5048a10565e63cbf7c94527ba81ce9be0bea # v0.8.4
         with:
           docker_hub_organization: superque
           docker_hub_login: ${{ secrets.docker_hub_login }}
           docker_hub_password: ${{ secrets.docker_hub_password }}
+          ghcr_io_organization: superq
+          ghcr_io_login: SuperQ
           ghcr_io_password: ${{ github.token }}
           quay_io_organization: superq
           quay_io_login: ${{ secrets.quay_io_login }}
@@ -68,13 +70,15 @@ jobs:
     if: |
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
     steps:
-      - uses: prometheus/promci/publish_release@d9d4f5688814f0b77bf003d07fb8c00507390634 # v0.8.2
+      - uses: prometheus/promci/publish_release@9c0e5048a10565e63cbf7c94527ba81ce9be0bea # v0.8.4
         with:
           docker_hub_organization: superque
           docker_hub_login: ${{ secrets.docker_hub_login }}
           docker_hub_password: ${{ secrets.docker_hub_password }}
+          ghcr_io_organization: superq
+          ghcr_io_login: SuperQ
           ghcr_io_password: ${{ github.token }}
           quay_io_organization: superq
-          quay_io_password: ${{ secrets.quay_io_password }}
           quay_io_login: ${{ secrets.quay_io_login }}
+          quay_io_password: ${{ secrets.quay_io_password }}
           github_token: ${{ github.token }}

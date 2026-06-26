@@ -5,6 +5,10 @@
 * [ENHANCEMENT]
 * [BUGFIX]
 
+## 0.12.0 / 2026-06-10
+
+* [CHANGE] Drop `go.uber.org/automaxprocs` now that Go 1.25 is required.
+
 ## 0.11.0 / 2026-03-09
 
 * [FEATURE] Add custom label list per target #215
