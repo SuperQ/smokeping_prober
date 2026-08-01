@@ -9,7 +9,7 @@ require (
 	github.com/prometheus/common v0.69.0
 	github.com/prometheus/exporter-toolkit v0.16.0
 	go.yaml.in/yaml/v2 v2.4.4
-	golang.org/x/sync v0.21.0
+	golang.org/x/sync v0.22.0
 )
 
 require (
