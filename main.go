@@ -236,6 +236,32 @@ func parseBuckets(buckets string) ([]float64, error) {
 	return bucketlist, nil
 }
 
+func defaultEpsilon(q float64) float64 {
+	if q >= 0.99 {
+		return 0.001
+	}
+	if q >= 0.9 {
+		return 0.01
+	}
+	return 0.05
+}
+
+func parseQuantiles(s string) (map[float64]float64, error) {
+	parts := strings.Split(s, ",")
+	objectives := make(map[float64]float64, len(parts))
+	for _, p := range parts {
+		q, err := strconv.ParseFloat(strings.TrimSpace(p), 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid quantile %q: %w", p, err)
+		}
+		if q <= 0 || q >= 1 {
+			return nil, fmt.Errorf("quantile must be between 0 and 1: %v", q)
+		}
+		objectives[q] = defaultEpsilon(q)
+	}
+	return objectives, nil
+}
+
 func init() {
 	prometheus.MustRegister(versioncollector.NewCollector("smokeping_prober"))
 }
@@ -267,18 +293,22 @@ func main() {
 		metricsPath = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
 		webConfig   = kingpinflag.AddFlags(kingpin.CommandLine, ":9374")
 
-		buckets    = kingpin.Flag("buckets", "A comma delimited list of buckets to use").Default(defaultBuckets).String()
-		factor     = kingpin.Flag("native-histogram-factor", "The scaling factor for native histogram buckets").Hidden().Default("1.05").Float()
-		interval   = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("1s").Duration()
-		privileged = kingpin.Flag("privileged", "Run in privileged ICMP mode").Default("true").Bool()
-		sizeBytes  = kingpin.Flag("ping.size", "Ping packet size in bytes").Short('s').Default("56").Int()
-		tosField   = kingpin.Flag("ping.tos", "Ping packet ToS field").Short('O').Default("0x00").Uint8()
-		hosts      = HostList(kingpin.Arg("hosts", "List of hosts to ping"))
+		buckets     = kingpin.Flag("buckets", "A comma delimited list of buckets to use").Default(defaultBuckets).String()
+		factor      = kingpin.Flag("native-histogram-factor", "The scaling factor for native histogram buckets").Hidden().Default("1.05").Float()
+		metricsMode   = kingpin.Flag("metrics.mode", "Metrics mode: histogram, summary, or both").Default("histogram").Enum("histogram", "summary", "both")
+		quantiles     = kingpin.Flag("quantiles", "Comma-delimited list of quantiles to track (used when metrics.mode is summary or both)").Default("0.5,0.9,0.95,0.99").String()
+		summaryMaxAge = kingpin.Flag("summary-max-age", "Sliding window duration for summary quantile calculation").Default("1m").Duration()
+		interval    = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("1s").Duration()
+		privileged  = kingpin.Flag("privileged", "Run in privileged ICMP mode").Default("true").Bool()
+		sizeBytes   = kingpin.Flag("ping.size", "Ping packet size in bytes").Short('s').Default("56").Int()
+		tosField    = kingpin.Flag("ping.tos", "Ping packet ToS field").Short('O').Default("0x00").Uint8()
+		hosts       = HostList(kingpin.Arg("hosts", "List of hosts to ping"))
 	)
 
 	var smokePingers smokePingers
 	var smokepingCollector *SmokepingCollector
 	var pingResponseSeconds *prometheus.HistogramVec
+	var pingResponseQuantiles *prometheus.SummaryVec
 
 	promslogConfig := &promslog.Config{}
 	flag.AddFlags(kingpin.CommandLine, promslogConfig)
@@ -310,9 +340,27 @@ func main() {
 		os.Exit(1)
 	}
 
+	var quantileObjectives map[float64]float64
+	if *metricsMode == "summary" || *metricsMode == "both" {
+		if strings.TrimSpace(*quantiles) == "" {
+			logger.Error("--quantiles must not be empty when --metrics.mode is summary or both")
+			os.Exit(1)
+		}
+		quantileObjectives, err = parseQuantiles(*quantiles)
+		if err != nil {
+			logger.Error("Failed to parse quantiles", "err", err)
+			os.Exit(1)
+		}
+	}
+
 	labelNames := buildLabelNamesFromConfig()
-	pingResponseSeconds = initMetrics(labelNames, bucketlist, *factor)
-	prometheus.MustRegister(pingResponseSeconds)
+	pingResponseSeconds, pingResponseQuantiles = initMetrics(labelNames, bucketlist, *factor, *metricsMode, quantileObjectives, *summaryMaxAge)
+	if pingResponseSeconds != nil {
+		prometheus.MustRegister(pingResponseSeconds)
+	}
+	if pingResponseQuantiles != nil {
+		prometheus.MustRegister(pingResponseQuantiles)
+	}
 
 	err = smokePingers.prepare(hosts, interval, privileged, sizeBytes, tosField)
 	if err != nil {
@@ -326,7 +374,7 @@ func main() {
 	}
 
 	smokePingers.start()
-	smokepingCollector = NewSmokepingCollector(smokePingers.started, labelNames, *pingResponseSeconds)
+	smokepingCollector = NewSmokepingCollector(smokePingers.started, labelNames, pingResponseSeconds, pingResponseQuantiles)
 	prometheus.MustRegister(smokepingCollector)
 
 	hup := make(chan os.Signal, 1)
@@ -356,9 +404,19 @@ func main() {
 
 			// Re-init metrics and collector with possibly updated label keys
 			newLabelNames := buildLabelNamesFromConfig()
-			prometheus.Unregister(pingResponseSeconds)
-			pingResponseSeconds = initMetrics(newLabelNames, bucketlist, *factor)
-			prometheus.MustRegister(pingResponseSeconds)
+			if pingResponseSeconds != nil {
+				prometheus.Unregister(pingResponseSeconds)
+			}
+			if pingResponseQuantiles != nil {
+				prometheus.Unregister(pingResponseQuantiles)
+			}
+			pingResponseSeconds, pingResponseQuantiles = initMetrics(newLabelNames, bucketlist, *factor, *metricsMode, quantileObjectives, *summaryMaxAge)
+			if pingResponseSeconds != nil {
+				prometheus.MustRegister(pingResponseSeconds)
+			}
+			if pingResponseQuantiles != nil {
+				prometheus.MustRegister(pingResponseQuantiles)
+			}
 
 			err = smokePingers.prepare(hosts, interval, privileged, sizeBytes, tosField)
 			if err != nil {
@@ -376,7 +434,7 @@ func main() {
 
 			// Recreate collector to reflect any label set changes
 			prometheus.Unregister(smokepingCollector)
-			smokepingCollector = NewSmokepingCollector(smokePingers.started, newLabelNames, *pingResponseSeconds)
+			smokepingCollector = NewSmokepingCollector(smokePingers.started, newLabelNames, pingResponseSeconds, pingResponseQuantiles)
 			prometheus.MustRegister(smokepingCollector)
 
 			logger.Info("Reloaded config file")

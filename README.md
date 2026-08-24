@@ -9,7 +9,7 @@ Prometheus style "smokeping" prober.
 
 ## Overview
 
-This prober sends a series of ICMP (or UDP) pings to a target and records the responses in Prometheus histogram metrics.
+This prober sends a series of ICMP (or UDP) pings to a target and records the responses in Prometheus histogram and/or summary metrics.
 
 ```
 usage: smokeping_prober [<flags>] [<hosts>...]
@@ -26,6 +26,10 @@ Flags:
       --web.config.file=""       [EXPERIMENTAL] Path to configuration file that can enable TLS or authentication.
       --buckets="5e-05,0.0001,0.0002,0.0004,0.0008,0.0016,0.0032,0.0064,0.0128,0.0256,0.0512,0.1024,0.2048,0.4096,0.8192,1.6384,3.2768,6.5536,13.1072,26.2144"
                                  A comma delimited list of buckets to use
+      --metrics.mode="histogram" Metrics mode: histogram, summary, or both
+      --quantiles="0.5,0.9,0.95,0.99"
+                                 Comma-delimited list of quantiles to track (used when metrics.mode is summary or both)
+      --summary-max-age=1m       Sliding window duration for summary quantile calculation
   -i, --ping.interval=1s         Ping interval duration
       --privileged               Run in privileged ICMP mode
   -s, --ping.size=56             Ping packet size in bytes
@@ -92,16 +96,43 @@ docker run \
   some-ping-target.example.com
 ```
 
+## Metrics mode
+
+By default, the prober exports histogram metrics (bucket-based). You can optionally enable summary metrics (pre-computed quantiles) using the `--metrics.mode` flag:
+
+- `histogram` (default) — exports `smokeping_response_duration_seconds` as a histogram with configurable buckets
+- `summary` — exports `smokeping_response_duration_seconds` as a summary with configurable quantiles
+- `both` — exports the histogram as `smokeping_response_duration_seconds` and the summary as `smokeping_response_duration_summary_seconds`
+
+When using `summary` or `both`, the `--quantiles` flag controls which quantiles are tracked (default: `0.5,0.9,0.95,0.99`). The `--summary-max-age` flag controls the sliding window duration for quantile calculation (default: `1m`).
+
+### Examples
+
+```bash
+# Histogram only (default, unchanged behavior)
+smokeping_prober host1 host2
+
+# Histogram + quantiles side by side
+smokeping_prober --metrics.mode both host1 host2
+
+# Quantiles only, custom set
+smokeping_prober --metrics.mode summary --quantiles "0.5,0.99" host1 host2
+```
+
+**Note:** Summary quantiles are computed client-side and cannot be aggregated across multiple prober instances. If you run multiple instances, prefer `histogram` mode and use `histogram_quantile()` in PromQL.
+
 ## Metrics
 
- Metric Name                            | Type       | Description
-----------------------------------------|------------|-------------------------------------------
- smokeping\_requests\_total             | Counter    | Counter of pings sent.
- smokeping\_response\_duration\_seconds | Histogram  | Ping response duration.
- smokeping\_response\_ttl               | Gauge      | The last response Time To Live (TTL).
- smokeping\_response\_duplicates\_total | Counter    | The number of duplicated response packets.
- smokeping\_receive\_errors\_total      | Counter    | The number of errors when Pinger attempts to receive packets.
- smokeping\_send\_errors\_total         | Counter    | The number of errors when Pinger attempts to send packets.
+ Metric Name                                      | Type       | Modes              | Description
+--------------------------------------------------|------------|--------------------|-------------------------------------------
+ smokeping\_requests\_total                        | Counter    | all                | Counter of pings sent.
+ smokeping\_response\_duration\_seconds            | Histogram  | histogram, both    | Ping response duration (buckets).
+ smokeping\_response\_duration\_seconds            | Summary    | summary            | Ping response duration (quantiles).
+ smokeping\_response\_duration\_summary\_seconds   | Summary    | both               | Ping response duration (quantiles, used in both mode to avoid name collision).
+ smokeping\_response\_ttl                          | Gauge      | all                | The last response Time To Live (TTL).
+ smokeping\_response\_duplicates\_total            | Counter    | all                | The number of duplicated response packets.
+ smokeping\_receive\_errors\_total                 | Counter    | all                | The number of errors when Pinger attempts to receive packets.
+ smokeping\_send\_errors\_total                    | Counter    | all                | The number of errors when Pinger attempts to send packets.
 
 ### TLS and basic authentication
 
