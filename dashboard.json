@@ -15,7 +15,7 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "9.2.4"
+      "version": "10.4.1"
     },
     {
       "type": "panel",
@@ -68,21 +68,6 @@
   "liveNow": false,
   "panels": [
     {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
-      "id": 7,
-      "panels": [],
-      "repeat": "target",
-      "repeatDirection": "h",
-      "title": "$target",
-      "type": "row"
-    },
-    {
       "cards": {},
       "color": {
         "cardColor": "#FF9830",
@@ -115,7 +100,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 1
+        "y": 0
       },
       "heatmap": {},
       "hideZeroBuckets": false,
@@ -124,7 +109,6 @@
       "legend": {
         "show": false
       },
-      "links": [],
       "options": {
         "calculate": false,
         "calculation": {},
@@ -153,7 +137,8 @@
         },
         "showValue": "never",
         "tooltip": {
-          "show": true,
+          "mode": "single",
+          "showColorScale": false,
           "yHistogram": false
         },
         "yAxis": {
@@ -164,7 +149,7 @@
           "unit": "s"
         }
       },
-      "pluginVersion": "9.2.4",
+      "pluginVersion": "10.4.1",
       "reverseYBuckets": false,
       "targets": [
         {
@@ -173,7 +158,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(smokeping_response_duration_seconds_bucket{host=\"${target:raw}\"}[1m])) by (le)",
+          "expr": "sum(\n    rate(smokeping_response_duration_seconds{\n        instance=\"$instance\",host=~\"$host\",ip=~\"$ip\"\n    }[$__rate_interval])\n)\nor\nsum by (le) (\n    rate(smokeping_response_duration_seconds_bucket{\n        instance=\"$instance\",host=~\"$host\",ip=~\"$ip\"\n    }[$__rate_interval])\n)",
           "format": "heatmap",
           "intervalFactor": 1,
           "legendFormat": "{{le}}",
@@ -181,7 +166,7 @@
           "refId": "A"
         }
       ],
-      "title": "Smoke Ping - $target",
+      "title": "Latency Heatmap",
       "tooltip": {
         "show": true,
         "showHistogram": false
@@ -210,6 +195,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "Loss %",
@@ -223,6 +209,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -241,6 +228,8 @@
           },
           "links": [],
           "mappings": [],
+          "max": 1,
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -297,7 +286,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 1
+        "y": 0
       },
       "id": 4,
       "options": {
@@ -322,24 +311,14 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "(smokeping_requests_total{host=\"${target:raw}\"} - smokeping_response_duration_seconds_count{host=\"${target:raw}\"})/smokeping_requests_total{host=\"${target:raw}\"} ",
+          "expr": "1-\nclamp(\n    (\n        sum(histogram_count(rate(smokeping_response_duration_seconds{instance=\"$instance\",host=~\"$host\",ip=~\"$ip\"}[$__rate_interval])))\n        or\n        sum(rate(smokeping_response_duration_seconds_count{instance=\"$instance\",host=~\"$host\",ip=~\"$ip\"}[$__rate_interval]))\n    )\n    /\n    sum(rate(smokeping_requests_total{instance=\"$instance\",host=~\"$host\",ip=~\"$ip\"}[$__rate_interval])),\n    0,\n    1\n)",
+          "hide": false,
           "legendFormat": "Percentage",
           "range": true,
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "expr": "(smokeping_requests_total{host=\"${target:raw}\"} - smokeping_response_duration_seconds_count{host=\"${target:raw}\"})",
-          "legendFormat": "Count",
-          "range": true,
-          "refId": "B"
         }
       ],
-      "title": "Packet Loss - $target",
+      "title": "Packet Loss",
       "type": "timeseries"
     },
     {
@@ -353,6 +332,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -366,6 +346,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -384,6 +365,7 @@
           },
           "links": [],
           "mappings": [],
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -444,7 +426,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 11
+        "y": 10
       },
       "id": 5,
       "options": {
@@ -472,19 +454,19 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "smokeping_response_duration_seconds_sum{host=\"${target:raw}\"} / smokeping_response_duration_seconds_count{host=\"${target:raw}\"}",
-          "legendFormat": "{{host}}",
+          "expr": "histogram_avg(rate(smokeping_response_duration_seconds{instance=\"$instance\",host=~\"$host\",ip=~\"$ip\"}[$__rate_interval]))",
+          "instant": false,
+          "legendFormat": "{{host}} - {{ip}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Latency - $target",
+      "title": "Average Latency",
       "type": "timeseries"
     }
   ],
   "refresh": "30s",
-  "schemaVersion": 37,
-  "style": "dark",
+  "schemaVersion": 39,
   "tags": [],
   "templating": {
     "list": [
@@ -494,15 +476,68 @@
           "type": "prometheus",
           "uid": "${DS_PROMETHEUS}"
         },
-        "definition": "label_values(smokeping_requests_total, host)",
+        "definition": "label_values(smokeping_prober_build_info,instance)",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "instance",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(smokeping_prober_build_info,instance)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(smokeping_requests_total{instance=\"$instance\"},host)",
         "hide": 0,
         "includeAll": true,
         "multi": false,
-        "name": "target",
+        "name": "host",
         "options": [],
         "query": {
-          "query": "label_values(smokeping_requests_total, host)",
-          "refId": "Prometheus-target-Variable-Query"
+          "qryType": 1,
+          "query": "label_values(smokeping_requests_total{instance=\"$instance\"},host)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(smokeping_requests_total{instance=\"$instance\", host=~\"$host\"},ip)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": false,
+        "name": "ip",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(smokeping_requests_total{instance=\"$instance\", host=~\"$host\"},ip)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
         "regex": "",
@@ -516,7 +551,7 @@
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-6h",
     "to": "now"
   },
   "timepicker": {
@@ -547,6 +582,6 @@
   "timezone": "",
   "title": "Smokeping",
   "uid": "i5aRaLaik",
-  "version": 12,
+  "version": 3,
   "weekStart": ""
 }
