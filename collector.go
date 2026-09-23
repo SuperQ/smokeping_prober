@@ -17,6 +17,7 @@ package main
 import (
 	"net"
 	"strconv"
+	"time"
 
 	probing "github.com/prometheus-community/pro-bing"
 	"github.com/prometheus/client_golang/prometheus"
@@ -35,7 +36,8 @@ var (
 )
 
 // initMetrics initializes (or re-initializes) the metric vectors with the provided label set.
-func initMetrics(labelNames []string, buckets []float64, factor float64) *prometheus.HistogramVec {
+// Returns histogram and summary vecs; either may be nil depending on metricsMode.
+func initMetrics(labelNames []string, buckets []float64, factor float64, metricsMode string, quantileObjectives map[float64]float64, summaryMaxAge time.Duration) (*prometheus.HistogramVec, *prometheus.SummaryVec) {
 	if pingResponseTTL != nil {
 		prometheus.Unregister(pingResponseTTL)
 	}
@@ -81,16 +83,39 @@ func initMetrics(labelNames []string, buckets []float64, factor float64) *promet
 		labelNames,
 	)
 
-	return prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Namespace:                   namespace,
-			Name:                        "response_duration_seconds",
-			Help:                        "A histogram of latencies for ping responses.",
-			Buckets:                     buckets,
-			NativeHistogramBucketFactor: factor,
-		},
-		labelNames,
-	)
+	var histogram *prometheus.HistogramVec
+	if metricsMode == "histogram" || metricsMode == "both" {
+		histogram = prometheus.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Namespace:                   namespace,
+				Name:                        "response_duration_seconds",
+				Help:                        "A histogram of latencies for ping responses.",
+				Buckets:                     buckets,
+				NativeHistogramBucketFactor: factor,
+			},
+			labelNames,
+		)
+	}
+
+	var summary *prometheus.SummaryVec
+	if metricsMode == "summary" || metricsMode == "both" {
+		name := "response_duration_seconds"
+		if metricsMode == "both" {
+			name = "response_duration_summary_seconds"
+		}
+		summary = prometheus.NewSummaryVec(
+			prometheus.SummaryOpts{
+				Namespace:  namespace,
+				Name:       name,
+				Help:       "A summary of latencies for ping responses.",
+				Objectives: quantileObjectives,
+				MaxAge:     summaryMaxAge,
+			},
+			labelNames,
+		)
+	}
+
+	return histogram, summary
 }
 
 // SmokepingCollector collects metrics from the probes and their pingers.
@@ -101,7 +126,7 @@ type SmokepingCollector struct {
 	labelNames   []string
 }
 
-func NewSmokepingCollector(probes []probe, labelNames []string, pingResponseSeconds prometheus.HistogramVec) *SmokepingCollector {
+func NewSmokepingCollector(probes []probe, labelNames []string, pingResponseSeconds *prometheus.HistogramVec, pingResponseQuantiles *prometheus.SummaryVec) *SmokepingCollector {
 	instance := SmokepingCollector{
 		requestsSent: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "", "requests_total"),
@@ -112,7 +137,7 @@ func NewSmokepingCollector(probes []probe, labelNames []string, pingResponseSeco
 		labelNames: labelNames,
 	}
 
-	instance.updateProbes(probes, pingResponseSeconds)
+	instance.updateProbes(probes, pingResponseSeconds, pingResponseQuantiles)
 
 	return &instance
 }
@@ -144,16 +169,26 @@ func (s *SmokepingCollector) buildLabelValues(pr *probe, overrideIP string) []st
 	return vals
 }
 
-func (s *SmokepingCollector) updateProbes(probes []probe, pingResponseSeconds prometheus.HistogramVec) {
+func (s *SmokepingCollector) updateProbes(probes []probe, pingResponseSeconds *prometheus.HistogramVec, pingResponseQuantiles *prometheus.SummaryVec) {
 	pingResponseDuplicates.Reset()
-	pingResponseSeconds.Reset()
+	if pingResponseSeconds != nil {
+		pingResponseSeconds.Reset()
+	}
+	if pingResponseQuantiles != nil {
+		pingResponseQuantiles.Reset()
+	}
 	pingResponseTTL.Reset()
 	pingSendErrors.Reset()
 	for _, pr := range probes {
 		// Init all metrics to 0s.
 		vals := s.buildLabelValues(&pr, "")
 		pingResponseDuplicates.WithLabelValues(vals...)
-		pingResponseSeconds.WithLabelValues(vals...)
+		if pingResponseSeconds != nil {
+			pingResponseSeconds.WithLabelValues(vals...)
+		}
+		if pingResponseQuantiles != nil {
+			pingResponseQuantiles.WithLabelValues(vals...)
+		}
 		pingResponseTTL.WithLabelValues(vals...)
 		pingSendErrors.WithLabelValues(vals...)
 
@@ -162,7 +197,12 @@ func (s *SmokepingCollector) updateProbes(probes []probe, pingResponseSeconds pr
 		// Setup handler functions.
 		p.pinger.OnRecv = func(pkt *probing.Packet) {
 			vals := s.buildLabelValues(&p, pkt.IPAddr.String())
-			pingResponseSeconds.WithLabelValues(vals...).Observe(pkt.Rtt.Seconds())
+			if pingResponseSeconds != nil {
+				pingResponseSeconds.WithLabelValues(vals...).Observe(pkt.Rtt.Seconds())
+			}
+			if pingResponseQuantiles != nil {
+				pingResponseQuantiles.WithLabelValues(vals...).Observe(pkt.Rtt.Seconds())
+			}
 			pingResponseTTL.WithLabelValues(vals...).Set(float64(pkt.TTL))
 			logger.Debug("Echo reply", "ip_addr", pkt.IPAddr,
 				"bytes_received", pkt.Nbytes, "icmp_seq", pkt.Seq, "rtt", pkt.Rtt, "ttl", pkt.TTL)
