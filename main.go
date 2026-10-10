@@ -136,7 +136,8 @@ func (s *smokePingers) start() {
 					)
 				}
 				return err
-			})
+			},
+		)
 		time.Sleep(splay)
 	}
 	s.prepared = nil
