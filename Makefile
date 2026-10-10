@@ -11,7 +11,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-DOCKER_ARCHS      ?= amd64 armv7 arm64
 DOCKER_REPO       ?= superque
 DOCKER_IMAGE_NAME ?= smokeping-prober
 
