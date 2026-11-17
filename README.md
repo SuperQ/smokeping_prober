@@ -29,6 +29,7 @@ Flags:
   -i, --ping.interval=1s         Ping interval duration
       --privileged               Run in privileged ICMP mode
   -s, --ping.size=56             Ping packet size in bytes
+  -I, --ping.interface=""        Network interface to send pings from
       --log.level=info           Only log messages with the given severity or above. One of: [debug, info, warn,
                                  error]
       --log.format=logfmt        Output format of log messages. One of: [logfmt, json]
@@ -55,6 +56,7 @@ targets:
   protocol: icmp # One of icmp, udp. Default: icmp (Requires privileged operation)
   size: 56 # Packet data size in bytes. Default 56 (Range: 24 - 65535)
   source: 127.0.1.1 # Souce IP address to use. Default: None (automatic selection)
+  interface: eth0 # Network interface to send from, like ping -I. Default: None (routing table)
 ```
 
 In each host group the `interval`, `network`, and `protocol` are optional.

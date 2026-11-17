@@ -1,7 +1,7 @@
 ## master / unreleased
 
 * [CHANGE]
-* [FEATURE]
+* [FEATURE] Send pings from a named network interface
 * [ENHANCEMENT]
 * [BUGFIX]
 
