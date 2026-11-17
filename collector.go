@@ -120,10 +120,11 @@ func NewSmokepingCollector(probes []probe, labelNames []string, pingResponseSeco
 func (s *SmokepingCollector) buildLabelValues(pr *probe, overrideIP string) []string {
 	vals := make([]string, 0, len(s.labelNames))
 	base := map[string]string{
-		"ip":     pr.pinger.IPAddr().String(),
-		"host":   pr.pinger.Addr(),
-		"source": pr.pinger.Source,
-		"tos":    strconv.Itoa(int(pr.pinger.TrafficClass())),
+		"ip":        pr.pinger.IPAddr().String(),
+		"host":      pr.pinger.Addr(),
+		"source":    pr.pinger.Source,
+		"interface": pr.pinger.InterfaceName,
+		"tos":       strconv.Itoa(int(pr.pinger.TrafficClass())),
 	}
 	labels := pr.labels
 	for _, k := range s.labelNames {

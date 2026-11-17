@@ -121,7 +121,7 @@ func (s *smokePingers) start() {
 	splay := time.Duration(s.maxInterval.Nanoseconds() / int64(len(s.started)))
 	for _, pr := range s.started {
 		pinger := pr.pinger
-		logger.Info("Starting prober", "address", pinger.Addr(), "interval", pinger.Interval, "size_bytes", pinger.Size, "source_address", pinger.Source)
+		logger.Info("Starting prober", "address", pinger.Addr(), "interval", pinger.Interval, "size_bytes", pinger.Size, "source_address", pinger.Source, "interface", pinger.InterfaceName)
 		s.g.Go(
 			func() error {
 				err := pinger.Run()
@@ -132,6 +132,7 @@ func (s *smokePingers) start() {
 						"interval", pinger.Interval,
 						"size_bytes", pinger.Size,
 						"source_address", pinger.Source,
+						"interface", pinger.InterfaceName,
 						"err", err,
 					)
 				}
@@ -159,7 +160,7 @@ func (s *smokePingers) stop() error {
 	return nil
 }
 
-func (s *smokePingers) prepare(hosts *[]string, interval *time.Duration, privileged *bool, sizeBytes *int, tosField *uint8) error {
+func (s *smokePingers) prepare(hosts *[]string, interval *time.Duration, privileged *bool, sizeBytes *int, tosField *uint8, iface *string) error {
 	probes := make([]probe, 0, len(*hosts))
 	var pinger *probing.Pinger
 	var host string
@@ -179,6 +180,7 @@ func (s *smokePingers) prepare(hosts *[]string, interval *time.Duration, privile
 		pinger.SetPrivileged(*privileged)
 		pinger.Size = *sizeBytes
 		pinger.SetTrafficClass(*tosField)
+		pinger.InterfaceName = *iface
 
 		probes = append(probes, probe{
 			pinger: pinger,
@@ -206,6 +208,7 @@ func (s *smokePingers) prepare(hosts *[]string, interval *time.Duration, privile
 			pinger.Size = packetSize
 			pinger.SetTrafficClass(targetGroup.ToS)
 			pinger.Source = targetGroup.Source
+			pinger.InterfaceName = targetGroup.Interface
 			if targetGroup.Protocol == "icmp" {
 				pinger.SetPrivileged(true)
 			}
@@ -242,13 +245,13 @@ func init() {
 }
 
 func buildLabelNamesFromConfig() []string {
-	base := []string{"ip", "host", "source", "tos"}
+	base := []string{"ip", "host", "source", "interface", "tos"}
 	m := map[string]struct{}{}
 	sc.RLock()
 	defer sc.RUnlock()
 	for _, tg := range sc.C.Targets {
 		for k := range tg.Labels {
-			if k == "ip" || k == "host" || k == "source" || k == "tos" {
+			if k == "ip" || k == "host" || k == "source" || k == "interface" || k == "tos" {
 				continue
 			}
 			m[k] = struct{}{}
@@ -268,13 +271,14 @@ func main() {
 		metricsPath = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
 		webConfig   = kingpinflag.AddFlags(kingpin.CommandLine, ":9374")
 
-		buckets    = kingpin.Flag("buckets", "A comma delimited list of buckets to use").Default(defaultBuckets).String()
-		factor     = kingpin.Flag("native-histogram-factor", "The scaling factor for native histogram buckets").Hidden().Default("1.05").Float()
-		interval   = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("1s").Duration()
-		privileged = kingpin.Flag("privileged", "Run in privileged ICMP mode").Default("true").Bool()
-		sizeBytes  = kingpin.Flag("ping.size", "Ping packet size in bytes").Short('s').Default("56").Int()
-		tosField   = kingpin.Flag("ping.tos", "Ping packet ToS field").Short('O').Default("0x00").Uint8()
-		hosts      = HostList(kingpin.Arg("hosts", "List of hosts to ping"))
+		buckets       = kingpin.Flag("buckets", "A comma delimited list of buckets to use").Default(defaultBuckets).String()
+		factor        = kingpin.Flag("native-histogram-factor", "The scaling factor for native histogram buckets").Hidden().Default("1.05").Float()
+		interval      = kingpin.Flag("ping.interval", "Ping interval duration").Short('i').Default("1s").Duration()
+		privileged    = kingpin.Flag("privileged", "Run in privileged ICMP mode").Default("true").Bool()
+		sizeBytes     = kingpin.Flag("ping.size", "Ping packet size in bytes").Short('s').Default("56").Int()
+		tosField      = kingpin.Flag("ping.tos", "Ping packet ToS field").Short('O').Default("0x00").Uint8()
+		pingInterface = kingpin.Flag("ping.interface", "Network interface to send pings from").Short('I').Default("").String()
+		hosts         = HostList(kingpin.Arg("hosts", "List of hosts to ping"))
 	)
 
 	var smokePingers smokePingers
@@ -315,7 +319,7 @@ func main() {
 	pingResponseSeconds = initMetrics(labelNames, bucketlist, *factor)
 	prometheus.MustRegister(pingResponseSeconds)
 
-	err = smokePingers.prepare(hosts, interval, privileged, sizeBytes, tosField)
+	err = smokePingers.prepare(hosts, interval, privileged, sizeBytes, tosField, pingInterface)
 	if err != nil {
 		logger.Error("Unable to create ping", "err", err)
 		os.Exit(1)
@@ -361,7 +365,7 @@ func main() {
 			pingResponseSeconds = initMetrics(newLabelNames, bucketlist, *factor)
 			prometheus.MustRegister(pingResponseSeconds)
 
-			err = smokePingers.prepare(hosts, interval, privileged, sizeBytes, tosField)
+			err = smokePingers.prepare(hosts, interval, privileged, sizeBytes, tosField, pingInterface)
 			if err != nil {
 				logger.Error("Unable to create ping from config", "err", err)
 				errCallback(err)
